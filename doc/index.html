@@ -1,0 +1,53 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>Aurinko - Clojure document database engine</title>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+</head>
+<body>
+  <h1>Welcome to Aurinko!</h1>
+  <p><em>Aurinko is a networked document database engine implementation in Clojure programming language.</em></p>
+  <h2>Features (and why choose Aurinko)</h2>
+  <ul>
+    <li>Store, manage and retrieve documents in native Clojure data structures using CON (Clojure Object Notation)</li>
+    <li>Durable data - Your data is safe in event of write-failure/unclean shutdown</li>
+    <li>Networked - Safely handle concurrent database connections</li>
+    <li>Nice performance - Handle 3,000+ writes / 6,000+ lookups per second with confidence</li>
+    <li>Handle complex query - Use stack based syntax to easily build powerful and complex queries</li>
+    <li>Compact - Implemented in just under 700 lines of Clojure code</li>
+  </ul>
+  <h2>Tutorial</h2>
+  <p>This 10 minutes tutorial will walk you through all features of Aurinko: <a href="tutorial.html">click here</a></p>
+  <h2>Implementation Details</h2>
+  <ul>
+    <li><a href="con.html">CON - Clojure Object Notation</a></li>
+    <li><a href="storage.html">Database storage and file formats</a></li>
+    <li><a href="query.html">Query optimization and index</a></li>
+    <li><a href="network.html">Networking and concurrency</a></li>
+    <li><a href="limitation.html">Technical limitations</a></li>
+  </ul>
+  <h2>Project Releases</h2>
+  <p>Aurinko is actively developed, please visit <a href="https://github.com/HouzuoGuo">my github</a> often and check out the latest news!</p>
+  <table>
+    <tr>
+      <th>Release</th>
+      <th>Date</th>
+      <th>Notable Changes</th>
+    </tr>
+    <tr>
+      <td>0.1</td>
+      <td>12 August 2012</td>
+      <td>The first public release</td>
+    </tr>
+  </table>
+  <h2>Feature Wish List</h2>
+  <ul>
+    <li>Implement skip-list index to support range queries</li>
+    <li>Support concurrent read</li>
+  </ul>
+  <h2>Contact</h2>
+  <p>You are very welcomed to submit your feedback/question/suggestion/feature request to the author <a href="mailto:guohouzuo@gmail.com">Howard Guo</a>. Please also follow me on Twitter <a href="https://twitter.com/hzguo">@hzguo</a> and my blog <a href="http://allstarnix.blogspot.com.au">Howard's programming and OS stuff</a>.</p>
+  <h2>License &amp; Copyright</h2>
+  <p>Source Copyright 2012 Howard Guo. Distributed under the <a href="http://www.eclipse.org/legal/epl-v10.html">Eclipse Public License</a>, the same as Clojure uses.</p>
+</body>
+</html>

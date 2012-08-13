@@ -1,0 +1,61 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>Aurinko - Clojure Object Notation</title>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+  <style type="text/css">
+    td { vertical-align: top; }
+    code { background-color: #FFFFCC; }
+    .response {
+      background-color: #CCFFFF;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>CON - Clojure Object Notation</h1>
+  <p><em><a href="index.html">Back to Index</a></em></p>
+  <p>CON is used everywhere in Aurinko: Document storage, server responses, client requests, etc. CON is natively understood by Clojure programming language.</p>
+  <p>To serialize an object into CON: <code>(pr-str object_here)</code><br />
+To de-serialize an object: <code>(read-string "CON_string")</code></p>
+  <p>The following table lists all the elements that may appear in Aurinko collection documents:</p>
+  <table>
+    <tr>
+      <th>Element</th>
+      <th>Examples</th>
+    </tr>
+    <tr>
+      <td>Number</td>
+      <td><code>12.345</code></td>
+    </tr>
+    <tr>
+      <td>String</td>
+      <td><code>"abc123"</code></td>
+    </tr>
+    <tr>
+      <td>Vector</td>
+      <td><code>["abc" 123 "def" 45.67]</code><br />
+May contain nested vectors/maps</td>
+    </tr>
+    <tr>
+      <td>Keyword</td>
+      <td><code>:this-is-a-keyword</code><br />
+Case-sensitive, may contain [0-9][A-Z][a-z] or dash '-'</td>
+    </tr>
+    <tr>
+      <td>Map</td>
+      <td><code>{:name "CON" :key2 23.45 :used-by ["Aurinko" "FleetDB"]}</code><br />
+May contain nested maps</td>
+    </tr>
+  </table>
+  <p>A comprehensive example:</p>
+  <pre class="response">
+{:name "Aurinko"
+ :type "Document database engine"
+ :depends-on {:Clojure   [1.3 1.4]
+              :Leiningen [1.7 2.0]
+              :JVM       [1.5 1.6 1.7]
+              :OS        ["Unix" "Linux" "Solaris" "Windows"]}}</pre>
+  <p><em><a href="index.html">Back to Index</a></em></p>
+</body>
+</html>
