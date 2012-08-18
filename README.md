@@ -1,4 +1,6 @@
-Welcome! Aurinko is a networked document database engine implementation in Clojure programming language.
+Welcome!
+--------
+Aurinko is a networked document database engine implementation in Clojure programming language.
 
 Features (and why choose Aurinko)
 ---------------------------------
