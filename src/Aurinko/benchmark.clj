@@ -12,7 +12,7 @@
     (doseq [v (range 5000)] (col/insert col0 {:tag v}))
     (doseq [v (col/all col0)] (col/update col0 (assoc v :tag2 v)))
     (doseq [v (col/all col0)] (col/delete col0 v))
-    
+
     (let [h (hash/new "hash" 12 100)]
       (prn "Hash - put 100k entries")
       (time (doseq [v (range 100000)] (hash/kv h v v)))
@@ -22,7 +22,7 @@
       (time (doseq [v (range 100000)] (hash/x h v 1 (fn [_] true))))
       (.delete (file "hash")))
     (prn)
-  
+
     (prn "Collection - insert 10k documents (3 indexes)")
     (col/index-path col1 [:thing1])
     (col/index-path col1 [:thing2])

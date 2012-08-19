@@ -22,8 +22,8 @@
 
 (deftype Hash [key-bits buk-size file ^{:unsynchronized-mutable true} num-buks] HashP
   (at    [this i] (fs/at file (+ FILE-HDR (* i (+ BUK-HDR (* ENTRY buk-size))))))
-  (nextb [this i] (fs/get-i (at this i)))
-  (lastb [this i]
+  (nextb [this i] ^int (fs/get-i (at this i)))
+  (lastb [this i] ^int
          (loop [^int curr i
                 ^int next (nextb this i)]
            (if (= next 0) curr (recur next (nextb this next))))) ; last buk has "next" set to 0
@@ -63,19 +63,25 @@
             (if (or (= count limit) ; stop when reached the limit or last entry
                     (and (= i buk-size) (= buk last-buk)))
               result
-              (let [entry      (+ (fs/pos (at this buk)) BUK-HDR (* ENTRY i))
-                    ^int valid (fs/get-i (fs/at file entry))
-                    ^int key   (fs/get-i file)
-                    ^int val   (fs/get-i file)]
+              (let [entry         (+ (fs/pos (at this buk)) BUK-HDR (* ENTRY i))
+                    ^int valid    (fs/get-i (fs/at file entry))
+                    ^int key      (fs/get-i file)
+                    ^int val      (fs/get-i file)]
                 (if (and (= valid 1) (= key-hash key) (filt val))
                   (do
                     (proc entry)
                     (if (= i buk-size)
                       ; go to next bucket if processed last entry of current bucket
-                      (recur (inc count) (conj result val) 0 (nextb this buk))
+                      (let [^int next-buk (nextb this buk)]
+                        (if (> next-buk buk)
+                          (recur (inc count) (conj result val) 0 next-buk)
+                          (throw (Exception. (str "Index file " (fs/path file) " is corrupted, repair collection please")))))
                       (recur (inc count) (conj result val) (inc i) buk)))
                   (if (= i buk-size)
-                    (recur count result 0 (nextb this buk))
+                    (let [^int next-buk (nextb this buk)]
+                      (if (> next-buk buk)
+                        (recur count result 0 next-buk)
+                        (throw (Exception. (str "Index file " (fs/path file) " is corrupted, repair collection please")))))
                     (recur count result (inc i) buk))))))))
   (k [this k limit filt] (scan this k limit (fn [_]) filt))
   (x [this k limit filt] (scan this k limit #(fs/put-i (fs/at file %) 0) filt)))
@@ -90,7 +96,7 @@
 (defn new [path key-bits buk-size]
   (let [new-file (fs/grow (fs/open path)
                           (+ FILE-HDR (* (Math/pow 2 key-bits)
-                                         (+ BUK-HDR (* buk-size ENTRY)))))] 
+                                         (+ BUK-HDR (* buk-size ENTRY)))))]
     (fs/put-i new-file key-bits)
     (fs/put-i new-file buk-size)
     (open path)))

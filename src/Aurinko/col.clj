@@ -38,7 +38,7 @@
 (deftype Col [dir data log ^{:unsynchronized-mutable true} indexes] ColP
   (insert [this doc]
           (if (map? doc)
-            (do 
+            (do
               (let [^int pos (fs/limit data)
                     pos-doc  (assoc doc :_pos pos)
                     text     (pr-str pos-doc)
