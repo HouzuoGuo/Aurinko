@@ -4,7 +4,7 @@
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
            (java.nio MappedByteBuffer ByteBuffer)))
 
-(def sep (java.io.File/separator))
+(def ^:const sep (java.io.File/separator))
 
 (defn findre [dir pattern]
   (doall (filter #(re-matches pattern (.getName ^java.io.File %)) (file-seq (file dir)))))

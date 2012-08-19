@@ -17,7 +17,7 @@
                   {:ok true})))
          (catch Exception e (prn {:err (.getMessage e)}) (.printStackTrace e))))))
 
-(def cmds
+(def ^:const cmds
   {; database commands
    :create   (fn [p [name & _]]    (enQ p (fn [] (db/create   @db name)) false))
    :rename   (fn [p [old new & _]] (enQ p (fn [] (db/rename   @db old new)) false))

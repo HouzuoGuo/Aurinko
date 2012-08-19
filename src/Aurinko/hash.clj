@@ -1,9 +1,9 @@
 (ns Aurinko.hash
   (:require (Aurinko [fs :as fs])))
 
-(def FILE-HDR 8) ; file header: number of key bits (int); entries per bucket (int)
-(def BUK-HDR 4)  ; bucket header: next chained bucket number (int)
-(def ENTRY 12)   ; entry: valid (int, 0 - deleted, 1 - valid); key (int); value (int)
+(def ^:const FILE-HDR 8) ; file header: number of key bits (int); entries per bucket (int)
+(def ^:const BUK-HDR 4)  ; bucket header: next chained bucket number (int)
+(def ^:const ENTRY 12)   ; entry: valid (int, 0 - deleted, 1 - valid); key (int); value (int)
 
 (defn last-bits [^long int ^long n]
   (bit-and int (unchecked-dec (bit-shift-left 1 n))))

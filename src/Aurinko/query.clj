@@ -88,7 +88,7 @@
 (defn sorted [op col stack]
   "Sort result set by path"
   (let [[path source & _] stack
-        sorted 
+        sorted
         (sort-by val
                  (into {}
                        (cond

@@ -4,7 +4,7 @@
             [clojure.string :as cstr])
   (:import (java.io File)))
 
-(def DOC-HDR 8) ; document header: valid (int, 0 - deleted, 1 - valid); allocated room (int)
+(def ^:const DOC-HDR 8) ; document header: valid (int, 0 - deleted, 1 - valid); allocated room (int)
 
 (defn file2index [^File f]
   (let [path (read-string
