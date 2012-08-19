@@ -14,12 +14,12 @@
     (doseq [v (col/all col0)] (col/delete col0 v))
 
     (let [h (hash/new "hash" 12 100)]
-      (prn "Hash - put 100k entries")
-      (time (doseq [v (range 100000)] (hash/kv h v v)))
-      (prn "Hash - get 100k entries")
-      (time (doseq [v (range 100000)] (hash/k h v 1 (fn [_] true))))
-      (prn "Hash - invalidate 100k entries")
-      (time (doseq [v (range 100000)] (hash/x h v 1 (fn [_] true))))
+      (prn "Hash - put 200k entries")
+      (time (doseq [v (range 200000)] (hash/kv h v v)))
+      (prn "Hash - get 200k entries")
+      (time (doseq [v (range 200000)] (hash/k h v 1 (fn [_] true))))
+      (prn "Hash - invalidate 200k entries")
+      (time (doseq [v (range 200000)] (hash/x h v 1 (fn [_] true))))
       (.delete (file "hash")))
     (prn)
 
@@ -30,7 +30,7 @@
     (time (doseq [v (range 10000)]
             (col/insert col1 {:a1 {:a2 {:a3 (rand-int 10000)}}
                               :thing1 (str (rand-int 10000))
-                              :thing2 (str (rand-int 10000))
+                              :thing2 (rand-int 10000)
                               :map {:complex {:data (rand-int 10000)}}
                               :action ["insert" "benchmark"]
                               :purpose "benchmark"})))

@@ -12,7 +12,7 @@ Collection:
   </tr>
   <tr>
     <td>Individual document size</td>
-    <td>512MB</td>
+    <td>1MB (1048576 bytes)</td>
     <td></td>
   </tr>
   <tr>

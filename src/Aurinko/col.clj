@@ -4,7 +4,8 @@
             [clojure.string :as cstr])
   (:import (java.io File)))
 
-(def ^:const DOC-HDR 8) ; document header: valid (int, 0 - deleted, 1 - valid); allocated room (int)
+(def ^:const DOC-HDR 8)       ; document header: valid (int, 0 - deleted, 1 - valid); allocated room (int)
+(def ^:const DOC-MAX 1048576) ; maximum document size
 
 (defn file2index [^File f]
   (let [path (read-string
@@ -39,11 +40,13 @@
   (insert [this doc]
           (if (map? doc)
             (do
-              (let [^int pos (fs/limit data)
+              (let [pos      (int (fs/limit data))
                     pos-doc  (assoc doc :_pos pos)
                     text     (pr-str pos-doc)
-                    length   (.length text)
-                    room     (+ length length)] ; leave 2x room for the doc
+                    length   (int (.length text))
+                    room     (int (+ length length))] ; leave 2x room for the doc
+                (when (> length DOC-MAX)
+                  (throw (Exception. (str "document is too large (> " DOC-MAX " bytes"))))
                 (fs/grow  data (+ DOC-HDR room))
                 (fs/at    data pos)
                 (fs/put-i data 1) ; valid
@@ -52,25 +55,24 @@
                 (fs/put-b data (byte-array length)) ; padding
                 (doseq [i indexes] (index-doc this pos-doc i)))
               (spit log (str "[:i " doc "]\n") :append true))
-            (str "document" doc "has to be a map")))
+            (throw (Exception. (str "document" doc "has to be a map")))))
   (update [this doc]
-          (let [^int pos (:_pos doc)]
+          (let [pos (:_pos doc)]
             (if pos
-              (let [^int room (fs/get-i (fs/adv (fs/at data pos) 4)) ; skip valid flag (an int)
+              (let [room (int (fs/get-i (fs/adv (fs/at data pos) 4))) ; skip valid flag (an int)
                     text (pr-str doc)
-                    size (.length text)]
+                    size (int (.length text))]
                 (if (> room size)
-                  (do
+                  (do ; overwrite the document
                     (unindex-doc this (by-pos this pos))
-                    ; overwritten the document
                     (fs/adv (fs/at data pos) 8)
                     (fs/put-b data (.getBytes text))
                     (fs/put-b data (byte-array (- room size)))
                     (doseq [i indexes] (index-doc this doc i))
                     (spit log (str "[:u " doc "]\n") :append true))
-                  (do (delete this doc) (insert this doc))))))) ; no enough room? re-insert
+                  (do (delete this doc) (insert this doc))))))) ; re-insert if no enough room left
   (delete [this doc]
-          (let [^int pos (:_pos doc)]
+          (let [pos (:_pos doc)]
             (when pos
               (fs/put-i (fs/at data pos) 0) ; set valid to 0 - deleted
               (unindex-doc this doc)
@@ -85,7 +87,7 @@
                (doseq [i indexes]
                  (let [val     (get-in doc (:path i))
                        indexed (if (vector? val) val [val])
-                       ^int doc-pos (:_pos doc)]
+                       doc-pos (int (:_pos doc))]
                    (doseq [v indexed] (hash/x (:hash i) v 1 #(= % doc-pos))))))
   (index-path [this path]
               (let [filename (str dir (index2filename path))]
@@ -105,10 +107,13 @@
   (index   [this path] (:hash (first (filter #(= (:path %) path) indexes))))
   (by-pos  [this pos]
            (try
-             (let [^int   valid (fs/get-i   (fs/at data pos))
-                   ^bytes text  (byte-array (fs/get-i data))]
-               (fs/get-b data text)
-               (if (= 1 valid) (read-string (String. (byte-array (remove zero? text))))))
+             (let [valid (int (fs/get-i   (fs/at data pos)))
+                   room  (int (fs/get-i data))]
+               (when (> room DOC-MAX)
+                 (throw (Exception. (str "collection " (fs/path data) " is corrupted, please repair collection"))))
+               (let [text (byte-array room)]
+                 (fs/get-b data text)
+                 (if (= 1 valid) (read-string (String. (byte-array (remove zero? text)))))))
              (catch java.nio.BufferUnderflowException e -1) ; EOF
              (catch Exception e (.printStackTrace e) {})))
   (all [this]

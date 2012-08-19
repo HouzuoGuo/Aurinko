@@ -14,7 +14,7 @@
 
 (defn scan-eq [_ col stack]
   "Lookup in a collection/result set"
-  (let [[^int limit val path source & _] stack
+  (let [[limit val path source & _] stack
         index-scan (fn [] (hash/k (col/index col path) val limit
                                   #(doc-match? (col/by-pos col %) path val)))] ; avoid hash collision
     (check-args :eq limit val path source)
@@ -43,7 +43,7 @@
 
 (defn scan-ineq [op col stack]
   "Range query in a collection/result set"
-  (let [[^int limit val path source & _] stack]
+  (let [[limit val path source & _] stack]
     (check-args op val path source)
     (cons (set (cond
                  (= source :col)
@@ -108,12 +108,6 @@
   "Put all document positions into a set and push to the stack"
   (cons (set (for [doc (col/all col)] (:_pos doc))) stack))
 
-(def kw-fun-map
-  {:eq scan-eq :ge >= :gt > :le <= :lt < :ne not=
-   :diff difference :intersect intersection :union union
-   :has #(not (nil? %)) :not-have nil?
-   :asc <= :desc >=})
-
 (defn q [col conds]
   (loop [stack     '()
          remaining conds]
@@ -129,6 +123,9 @@
                (:asc :desc)              sorted
                :all                      col2set
                (throw (Exception. (str thing ": not understood"))))
-              (thing kw-fun-map) col stack)
+              (thing {:eq scan-eq :ge >= :gt > :le <= :lt < :ne not=
+                      :diff difference :intersect intersection :union union
+                      :has #(not (nil? %)) :not-have nil?
+                      :asc <= :desc >=}) col stack)
             (cons thing stack))
           (rest remaining))))))
