@@ -5,4 +5,5 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.4.0"]]
   :main Aurinko.core
-  :warn-on-reflection true)
+  :warn-on-reflection true
+  :jvm-opts ["-Xms256m" "-Xmx1024m" "-XX:PermSize=96m" "-XX:MaxPermSize=256m"])
