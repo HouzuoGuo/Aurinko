@@ -30,7 +30,7 @@ Project Releases
 ----------------
 
 The first version "0.1" was released on 12 August 2012.
-Aurinko is actively developed, please make feature recommendations and check out [Issues][] section for features wish list.
+Aurinko is actively developed, please submit feature recommendations and check out [Issues][] section for features wish list.
 
 Contact
 -------
