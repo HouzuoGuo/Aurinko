@@ -3,14 +3,15 @@
   (:require (Aurinko [hash :as hash] [col :as col] [fs :as fs] [query :as query])))
 
 (defn -main [& args]
-  (Thread/sleep 10000)
   (.mkdir (file "col0"))
   (.mkdir (file "col1"))
   (let [col0 (col/open "col0")
         col1 (col/open "col1")]
-    (prn "exercising buffer..")
+    (prn "Warming up..")
     (doseq [v (range 20000)] (col/insert col0 {:tag v}))
+    (prn "insert done")
     (doseq [v (col/all col0)] (col/update col0 (assoc v :tag2 v)))
+    (prn "update done")
     (doseq [v (col/all col0)] (col/delete col0 v))
 
     (let [h (hash/new "hash" 12 100)]
