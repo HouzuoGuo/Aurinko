@@ -2,7 +2,7 @@ Welcome!
 --------
 Aurinko is a networked document database engine implementation in Clojure programming language.
 
-Features (and why choose Aurinko)
+Features (and why you would choose Aurinko)
 ---------------------------------
 
 -   Store, manage and retrieve documents in native Clojure data structures using CON (Clojure Object Notation)
@@ -30,7 +30,7 @@ Project Releases
 ----------------
 
 The first version "0.1" was released on 12 August 2012.
-Aurinko is actively developed, please make feature recommendations and check out [Issues][] section for features wish list.
+Aurinko is actively developed, please submit feature recommendations and check out [Issues][] section for features wish list.
 
 Contact
 -------
