@@ -74,7 +74,9 @@
            (throw (Exception. (str "collection " name " does not exist")))))
   (all   [this] (fs/ls dir))
   (save  [this] (doseq [c (vals cols)] (col/save c)))
-  (close [this] (doseq [c (vals cols)] (col/close c))))
+  (close [this]
+         (save this)
+         (doseq [c (vals cols)] (col/close c))))
 
 (defn open [path]
   (if-not (.exists (file path))

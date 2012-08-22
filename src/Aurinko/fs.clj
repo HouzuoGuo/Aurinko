@@ -2,7 +2,7 @@
   (:use [clojure.java.io :only [file reader]])
   (:import (java.io RandomAccessFile))
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
-           (java.nio MappedByteBuffer ByteBuffer)))
+           (java.nio MappedByteBuffer)))
 
 (def ^:const sep (java.io.File/separator))
 

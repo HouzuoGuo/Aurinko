@@ -1,10 +1,11 @@
 (ns Aurinko.col
   (:use [clojure.java.io :only [file]])
   (:require (Aurinko [hash :as hash] [fs :as fs]) [clojure.string :as cstr])
-  (:import (java.io File RandomAccessFile))
+  (:import (java.io File RandomAccessFile PrintWriter BufferedWriter FileWriter))
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
-           (java.nio MappedByteBuffer ByteBuffer)))
+           (java.nio MappedByteBuffer)))
 
+(def ^:const DOC-HDR (int 8)) ; document header - valid (0 or 1), allocated room
 (def ^:const DOC-MAX (int 1048576)) ; maximum document size
 
 (defn file2index [^File f]
@@ -36,10 +37,9 @@
   (save         [this]       "Flush buffer to disk")
   (close        [this]))
 
-(deftype Col [dir data-fc
-                   ^{:unsynchronized-mutable true} data
-                   ^{:unsynchronized-mutable true} log
-                   ^{:unsynchronized-mutable true} indexes] ColP
+(deftype Col [dir data-fc log
+              ^{:unsynchronized-mutable true} data
+              ^{:unsynchronized-mutable true} indexes] ColP
   (insert [this doc]
           (if (map? doc)
             (do
@@ -51,42 +51,42 @@
                 (when (> length DOC-MAX)
                   (throw (Exception. (str "document is too large (> " DOC-MAX " bytes"))))
                 (set! data (.map ^FileChannel data-fc FileChannel$MapMode/READ_WRITE
-                             0 (+ (.limit ^MappedByteBuffer data) (+ 8 room))))
+                             0 (+ (.limit ^MappedByteBuffer data) (+ DOC-HDR room))))
                 (.position ^MappedByteBuffer data pos)
                 (.putInt   ^MappedByteBuffer data 1) ; valid
                 (.putInt   ^MappedByteBuffer data room) ; allocated room
                 (.put      ^MappedByteBuffer data (.getBytes text)) ; document
                 (.put      ^MappedByteBuffer data (byte-array length)) ; padding
                 (doseq [i indexes] (index-doc this pos-doc i)))
-              (spit log (str "[:i " doc "]\n") :append true))
+              (.println ^PrintWriter log (str "[:i " doc "]")))
             (throw (Exception. (str "document" doc "has to be a map")))))
   (update [this doc]
           (let [pos (:_pos doc)]
-            (if pos
-              (.position ^MappedByteBuffer data (int pos))
-              (let [valid (.getInt ^MappedByteBuffer data)
-                    room  (int (.getInt ^MappedByteBuffer data))
+            (when pos
+              (.position ^MappedByteBuffer data (+ 4 pos))
+              (let [room  (int (.getInt ^MappedByteBuffer data))
                     text  (pr-str doc)
                     size  (int (.length text))]
                 (if (> room size)
                   (do ; overwrite the document
                     (unindex-doc this (by-pos this pos))
+                    (.position ^MappedByteBuffer data (+ DOC-HDR pos))
                     (.put ^MappedByteBuffer data (.getBytes text))
                     (.put ^MappedByteBuffer data (byte-array (- room size)))
                     (doseq [i indexes] (index-doc this doc i))
-                    (spit log (str "[:u " doc "]\n") :append true))
+                    (.println ^PrintWriter log (str "[:u " doc "]")))
                   (do (delete this doc) (insert this doc))))))) ; re-insert if no enough room left
   (delete [this doc]
           (let [pos (:_pos doc)]
             (when pos
-              (.position ^MappedByteBuffer data (int pos))
-              (.putInt   ^MappedByteBuffer data (int 0)) ; set valid to 0 - deleted
+              (.position ^MappedByteBuffer data pos)
+              (.putInt   ^MappedByteBuffer data 0) ; set valid to 0 - deleted
               (unindex-doc this doc)
-              (spit log (str "[:d " pos "]\n") :append true))))
+              (.println ^PrintWriter log (str "[:d " pos "]")))))
   (index-doc [this doc i]
              (let [val      (get-in doc (:path i))
                    to-index (if (vector? val) val [val])]
-               (if val
+               (when val
                  (doseq [v to-index] ; index everything inside a vector
                    (hash/kv (:hash i) v (:_pos doc))))))
   (unindex-doc [this doc]
@@ -119,24 +119,29 @@
                (when (> room DOC-MAX)
                  (throw (Exception. (str "collection " dir " is corrupted, please repair collection"))))
                (let [text (byte-array room)]
-                 (.get ^MappedByteBuffer data text)
-                 (if (= 1 valid) (read-string (String. (byte-array (remove zero? text)))))))
+                 (.get ^MappedByteBuffer data ^bytes text)
+                 (if (= 1 valid)
+                   (read-string (String. (byte-array (remove zero? text)))))))
              (catch java.nio.BufferUnderflowException e -1) ; EOF
-             (catch Exception e (.printStackTrace e) {})))
+             (catch Exception e (.printStackTrace e))))
   (all [this]
        (.position ^MappedByteBuffer data 0)
-       (doall (remove nil? (take-while #(not= % -1) (repeatedly #(by-pos this (.position ^MappedByteBuffer data)))))))
+       (doall (remove nil? (take-while #(not= % -1)
+                                       (repeatedly #(by-pos this (.position ^MappedByteBuffer data)))))))
   (save  [this]
          (doseq [i indexes] (hash/save (:hash i)))
-         (.force ^FileChannel data-fc false))
+         (.force ^FileChannel data-fc false)
+         (.flush ^PrintWriter log))
   (close [this]
+         (save this)
          (doseq [i indexes] (hash/close (:hash i)))
-         (.close ^FileChannel data-fc)))
+         (.close ^FileChannel data-fc)
+         (.close ^PrintWriter log)))
 
 (defn open [path]
-  (let [fc (.getChannel (RandomAccessFile. ^String (str path fs/sep "data") "rw"))]
-    (Col. (str path fs/sep)
+  (let [fc (.getChannel (RandomAccessFile. ^String (str path (File/separator) "data") "rw"))]
+    (Col. (str path (File/separator))
           fc
+          (PrintWriter. (BufferedWriter. (FileWriter. (str path (java.io.File/separator) "log") true)))
           (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))
-          (str path fs/sep "log")
           (remove nil? (map file2index (fs/findre path #".*\.index"))))))
