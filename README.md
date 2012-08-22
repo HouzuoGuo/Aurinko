@@ -8,7 +8,7 @@ Features (and why you would choose Aurinko)
 -   Store, manage and retrieve documents in native Clojure data structures using CON (Clojure Object Notation)
 -   Durable data - Your data is safe in event of write-failure/unclean shutdown
 -   Networked - Safely handle concurrent database connections
--   Nice performance - Handle 3,000+ writes / 6,000+ lookups per second with confidence
+-   Nice performance - Handle 6,000+ writes / 8,000+ lookups per second with confidence
 -   Handle complex query - Use stack based syntax to easily build powerful and complex queries
 -   Compact - Implemented in just under 700 lines of Clojure code
 
