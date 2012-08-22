@@ -25,8 +25,9 @@
             (if ((keyword new) cols)
               (throw (Exception. (str "new collection name " new " is already used")))
               (if (.renameTo (file dir old) (file dir new))
-                (set! cols (assoc (dissoc cols (keyword old))
-                                  (keyword new) (col/open (str dir fs/sep new))))
+                (do (save this)
+                  (set! cols (assoc (dissoc cols (keyword old))
+                                    (keyword new) (col/open (str dir fs/sep new)))))
                 (throw (Exception. (str "failed to rename collection directory")))))
             (throw (Exception. (str "collection " old " does not exist")))))
   (delete [this name]
@@ -41,6 +42,7 @@
                 (let [indexed (col/indexed c)
                       tmp-name (str (System/nanoTime))
                       tmp      (do (create this tmp-name) ((keyword tmp-name) cols))]
+                  (save this)
                   (doseq [doc (col/all ((keyword name) cols))] (col/insert tmp doc))
                   (delete this name)
                   (rename this tmp-name name)
@@ -53,6 +55,7 @@
               (let [indexed  (col/indexed c)
                     tmp-name (str (System/nanoTime))
                     tmp      (do (create this tmp-name) (col this tmp-name))]
+                (save this)
                 (fs/lines (str dir fs/sep name fs/sep "log")
                           (fn [line]
                             (try

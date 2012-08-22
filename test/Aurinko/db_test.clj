@@ -25,7 +25,6 @@
       (is (= (.length (file "db/c1/data")) (+ 8 (* 15 2))))
       (is (= (set (db/all db)) #{"c1" "c2"}))
       (is (= (set (col/indexed (db/col db "c1"))) #{[:a]}))
-      (db/save db)
       ; repair collection
       (spit "db/c2/data" "#@*&$!(*@)") ; completely corrupt data
       (spit "db/c2/log" "#@*&$!(*@)" :append true) ; corrupt log file too
