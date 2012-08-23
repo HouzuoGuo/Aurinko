@@ -1,12 +1,12 @@
 Welcome! Aurinko is a networked document database engine implementation in Clojure programming language.
 
-Features (and why choose Aurinko)
+Features (and why you would choose Aurinko)
 ---------------------------------
 
 -   Store, manage and retrieve documents in native Clojure data structures using CON (Clojure Object Notation)
 -   Durable data - Your data is safe in event of write-failure/unclean shutdown
 -   Networked - Safely handle concurrent database connections
--   Nice performance - Handle 3,000+ writes / 6,000+ lookups per second with confidence
+-   Nice performance - Handle 6,000+ writes / 8,000+ lookups per second with confidence
 -   Handle complex query - Use stack based syntax to easily build powerful and complex queries
 -   Compact - Implemented in just under 700 lines of Clojure code
 
@@ -26,9 +26,29 @@ Implementation Details
 
 Project Releases
 ----------------
+<table>
+  <tr>
+    <th>Version</th>
+    <th>Release date</th>
+    <th>Branch</th>
+    <th>Changes/Notes</th>
+  </tr>
+  <tr>
+    <td>0.1</td>
+    <td>12 August 2012</td>
+    <td>0.1</td>
+    <td>First release</td>
+  </tr>
+  <tr>
+    <td>0.2</td>
+    <td>23 August 2012</td>
+    <td>0.2</td>
+    <td>%40+ performance improvements<br />
+V0.1 database is fully compatible with V0.2</td>
+  </tr>
+</table>
 
-The first version "0.1" was released on 12 August 2012.
-Aurinko is actively developed, please make feature recommendations and check out [Issues][] section for features wish list.
+Aurinko is actively developed, please submit feature recommendations and check out [Issues][] section for features wish list.
 
 Contact
 -------

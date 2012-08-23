@@ -228,7 +228,7 @@ To update documents, you will need to provide a Clojure function that takes one 
 
 Update the name of RHEL operating system, change it to "Redhat Enterprise Linux":
 
-    [:update "os" #(assoc % :name "Redhat Enterprise Linux") :col [:name] "RHEL" -1 eq]
+    [:update "os" #(assoc % :name "Redhat Enterprise Linux") :col [:name] "RHEL" -1 :eq]
     > {:ok true}
     [:findall "os"]
     > {:result [{:_pos 292, :name "opensolaris", :releases {:initial 2008, :latest 2009}} {:_pos 446, :name "Redhat Enterprise Linux", :releases {:initial 2003, :latest 2012}}], :ok true}
