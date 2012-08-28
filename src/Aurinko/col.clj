@@ -1,7 +1,7 @@
 (ns Aurinko.col
   (:use [clojure.java.io :only [file]])
   (:require (Aurinko [hash :as hash] [fs :as fs]) [clojure.string :as cstr])
-  (:import (java.io File RandomAccessFile PrintWriter BufferedWriter FileWriter))
+  (:import (java.io File RandomAccessFile PrintWriter FileWriter))
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
            (java.nio MappedByteBuffer)))
 
@@ -41,54 +41,49 @@
               ^{:unsynchronized-mutable true} data
               ^{:unsynchronized-mutable true} indexes] ColP
   (insert [this doc]
-          (if (map? doc)
-            (do
-              (let [pos      (int (.limit ^MappedByteBuffer data))
-                    pos-doc  (assoc doc :_pos pos)
-                    text     (pr-str pos-doc)
-                    length   (int (.length text))
-                    room     (int (+ length length))] ; leave 2x room for the doc
-                (when (> length DOC-MAX)
-                  (throw (Exception. (str "document is too large (> " DOC-MAX " bytes"))))
-                (set! data (.map ^FileChannel data-fc FileChannel$MapMode/READ_WRITE
-                             0 (+ (.limit ^MappedByteBuffer data) (+ DOC-HDR room))))
-                (.position ^MappedByteBuffer data pos)
-                (.putInt   ^MappedByteBuffer data 1) ; valid
-                (.putInt   ^MappedByteBuffer data room) ; allocated room
-                (.put      ^MappedByteBuffer data (.getBytes text)) ; document
-                (.put      ^MappedByteBuffer data (byte-array length)) ; padding
-                (doseq [i indexes] (index-doc this pos-doc i)))
-              (.println ^PrintWriter log (str "[:i " doc "]")))
-            (throw (Exception. (str "document" doc "has to be a map")))))
+          (when-not (map? doc)
+            (throw (Exception. (str "document" doc "has to be a map"))))
+          (let [pos      (int (.limit ^MappedByteBuffer data))
+                pos-doc  (assoc doc :_pos pos)
+                text     (pr-str pos-doc)
+                length   (int (.length text))
+                room     (int (+ length length))] ; leave 2x room for the doc
+            (when (> length DOC-MAX)
+              (throw (Exception. (str "document is too large (> " DOC-MAX " bytes"))))
+            (set! data (.map ^FileChannel data-fc FileChannel$MapMode/READ_WRITE
+                         0 (+ (.limit ^MappedByteBuffer data) (+ DOC-HDR room))))
+            (.position ^MappedByteBuffer data pos)
+            (.putInt   ^MappedByteBuffer data 1) ; valid
+            (.putInt   ^MappedByteBuffer data room) ; allocated room
+            (.put      ^MappedByteBuffer data (.getBytes text)) ; document
+            (.put      ^MappedByteBuffer data (byte-array length)) ; padding
+            (doseq [i indexes] (index-doc this pos-doc i)))
+          (.println ^PrintWriter log (str "[:i " doc "]")))
   (update [this doc]
-          (let [pos (:_pos doc)]
-            (when pos
-              (.position ^MappedByteBuffer data (+ 4 pos))
-              (let [room  (int (.getInt ^MappedByteBuffer data))
-                    text  (pr-str doc)
-                    size  (int (.length text))]
-                (if (> room size)
-                  (do ; overwrite the document
-                    (unindex-doc this (by-pos this pos))
-                    (.position ^MappedByteBuffer data (+ DOC-HDR pos))
-                    (.put ^MappedByteBuffer data (.getBytes text))
-                    (.put ^MappedByteBuffer data (byte-array (- room size)))
-                    (doseq [i indexes] (index-doc this doc i))
-                    (.println ^PrintWriter log (str "[:u " doc "]")))
-                  (do (delete this doc) (insert this doc))))))) ; re-insert if no enough room left
+          (when-let [pos (:_pos doc)]
+            (.position ^MappedByteBuffer data (+ 4 pos))
+            (let [room  (int (.getInt ^MappedByteBuffer data))
+                  text  (pr-str doc)
+                  size  (int (.length text))]
+              (if (> room size)
+                (do ; overwrite the document
+                  (unindex-doc this (by-pos this pos))
+                  (.position ^MappedByteBuffer data (+ DOC-HDR pos))
+                  (.put ^MappedByteBuffer data (.getBytes text))
+                  (.put ^MappedByteBuffer data (byte-array (- room size)))
+                  (doseq [i indexes] (index-doc this doc i))
+                  (.println ^PrintWriter log (str "[:u " doc "]")))
+                (do (delete this doc) (insert this doc)))))) ; re-insert if no enough room left
   (delete [this doc]
-          (let [pos (:_pos doc)]
-            (when pos
-              (.position ^MappedByteBuffer data pos)
-              (.putInt   ^MappedByteBuffer data 0) ; set valid to 0 - deleted
-              (unindex-doc this doc)
-              (.println ^PrintWriter log (str "[:d " pos "]")))))
+          (when-let [pos (:_pos doc)]
+            (.position ^MappedByteBuffer data pos)
+            (.putInt   ^MappedByteBuffer data 0) ; set valid to 0 - deleted
+            (unindex-doc this doc)
+            (.println ^PrintWriter log (str "[:d " pos "]"))))
   (index-doc [this doc i]
-             (let [val      (get-in doc (:path i))
-                   to-index (if (vector? val) val [val])]
-               (when val
-                 (doseq [v to-index] ; index everything inside a vector
-                   (hash/kv (:hash i) v (:_pos doc))))))
+             (when-let [val (get-in doc (:path i))]
+               (doseq [v (if (vector? val) val [val])] ; index everything inside a vector
+                 (hash/kv (:hash i) v (:_pos doc)))))
   (unindex-doc [this doc]
                (doseq [i indexes]
                  (let [val     (get-in doc (:path i))
@@ -97,11 +92,11 @@
                    (doseq [v indexed] (hash/x (:hash i) v 1 #(= % doc-pos))))))
   (index-path [this path]
               (let [filename (str dir (index2filename path))]
-                (if (or (nil? filename) (.exists (file filename)))
-                  (throw (Exception. (str path " is an invalid path or already indexed")))
-                  (let [new-index {:path path :hash (hash/new filename 12 100)}]
-                    (set! indexes (conj indexes new-index))
-                    (doseq [doc (all this)] (index-doc this doc new-index)))))) ; index all docs on the path
+                (when (or (nil? filename) (.exists (file filename)))
+                  (throw (Exception. (str path " is an invalid path or already indexed"))))
+                (let [new-index {:path path :hash (hash/new filename 12 100)}]
+                  (set! indexes (conj indexes new-index))
+                  (doseq [doc (all this)] (index-doc this doc new-index))))) ; index all docs on the path
   (unindex-path [this path]
                 (let [filename (str dir (index2filename path))]
                   (if (.exists (file filename))
@@ -113,7 +108,7 @@
   (index   [this path] (:hash (first (filter #(= (:path %) path) indexes))))
   (by-pos  [this pos]
            (try
-             (.position ^MappedByteBuffer data (int pos))
+             (.position ^MappedByteBuffer data pos)
              (let [valid (int (.getInt ^MappedByteBuffer data))
                    room  (int (.getInt ^MappedByteBuffer data))]
                (when (> room DOC-MAX)
@@ -142,6 +137,6 @@
   (let [fc (.getChannel (RandomAccessFile. ^String (str path (File/separator) "data") "rw"))]
     (Col. (str path (File/separator))
           fc
-          (PrintWriter. (BufferedWriter. (FileWriter. (str path (java.io.File/separator) "log") true)))
+          (PrintWriter. (FileWriter. (str path (java.io.File/separator) "log") true))
           (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))
           (remove nil? (map file2index (fs/findre path #".*\.index"))))))

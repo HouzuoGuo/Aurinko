@@ -17,7 +17,7 @@
                   {:ok true})))
          (catch Exception e (prn {:err (.getMessage e)}) (.printStackTrace e))))))
 
-(def ^:const cmds
+(def cmds
   {; database commands
    :create   (fn [p [name & _]]    (enQ p (fn [] (db/create   @db name)) false))
    :rename   (fn [p [old new & _]] (enQ p (fn [] (db/rename   @db old new)) false))
@@ -66,14 +66,13 @@
                        (binding [*in* (BufferedReader. (InputStreamReader. in))
                                  *out* (PrintWriter. ^OutputStream out)]
                          (loop []
-                           (let [line (.readLine ^BufferedReader *in*)]
-                             (when line
-                               (try
-                                 (let [red  (load-string line)
-                                       cmd  ((first red) cmds)]
-                                   (if cmd
-                                     (cmd *out* (rest red))
-                                     (throw (Exception. (str "Unknown command" cmd)))))
-                                 (catch Exception e (prn {:err (.getMessage e)})))
-                               (recur))))))))
+                           (when-let [line (.readLine ^BufferedReader *in*)]
+                             (try
+                               (let [red  (load-string line)
+                                     cmd  ((first red) cmds)]
+                                 (if cmd
+                                   (cmd *out* (rest red))
+                                   (throw (Exception. (str "Unknown command" cmd)))))
+                               (catch Exception e (prn {:err (.getMessage e)})))
+                             (recur)))))))
     (prn "usage: lein run port_number db_directory")))

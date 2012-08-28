@@ -3,7 +3,6 @@
   (:require (Aurinko [hash :as hash] [col :as col] [fs :as fs] [query :as query])))
 
 (defn -main [& args]
-  (Thread/sleep 5000)
   (.mkdir (file "col0"))
   (.mkdir (file "col1"))
   (let [col0 (col/open "col0")
