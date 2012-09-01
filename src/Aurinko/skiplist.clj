@@ -41,11 +41,11 @@
                    lvl-ptr (nth (:lvls node) lvl)]
                (cond
                  (< (:k node) k)
-                 (if (not= lvl-ptr 0)
+                 (if (not= lvl-ptr -1)
                    (recur matches n lvl-ptr)
                    {:n n :matches (persistent! matches)})
                  (= (:k node) k)
-                 (if (not= lvl-ptr 0)
+                 (if (not= lvl-ptr -1)
                    (recur (conj! matches node) n lvl-ptr)
                    {:n n :matches (persistent! (conj! matches node))})
                  (> (:k node) k)
@@ -60,6 +60,7 @@
                  (recur (dec lvl) cut (:n cut-lvl)))
                (persistent! cut))))
   (kv-after [this k v node top-lvl]
+            (prn k v "after" node "up to" top-lvl)
             (let [new-node-pos (.limit file)
                   new-node-num (quot (- (.limit file) FILE-HDR) (+ NODE (* levels PTR-SIZE)))]
               (set! file (.map fc FileChannel$MapMode/READ_WRITE
@@ -96,5 +97,5 @@
     (.putInt file levels)
     (.putInt file chance)
     (doseq [l (range (+ 2 levels))]
-      (.putInt file 0))
+      (.putInt file -1))
     (open path)))
