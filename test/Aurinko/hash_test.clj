@@ -6,7 +6,7 @@
 (deftest last-bits
   (is (= (hash/last-bits 63 2) 3)))
 
-(deftest hash
+(deftest hash-test
   (let [h (hash/new "hash" 1 2)]
     ; put entries
     (hash/kv h "a" 1)

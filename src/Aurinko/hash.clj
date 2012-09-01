@@ -3,9 +3,9 @@
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
            (java.nio MappedByteBuffer)))
 
-(def ^:const FILE-HDR (int 8)) ; file header: number of key bits (int); entries per bucket (int)
-(def ^:const BUK-HDR (int 4))  ; bucket header: next chained bucket number (int)
-(def ^:const ENTRY (int 12))   ; entry: valid (int, 0 - deleted, 1 - valid); key (int); value (int)
+(def ^:const FILE-HDR (int 8))  ; file header: number of key bits (int); entries per bucket (int)
+(def ^:const BUK-HDR  (int 4))  ; bucket header: next chained bucket number (int)
+(def ^:const ENTRY    (int 12)) ; entry: valid (int, 0 - deleted, 1 - valid); key (int); value (int)
 
 (defn last-bits [integer n]
   (bit-and integer (unchecked-dec (bit-shift-left 1 n))))

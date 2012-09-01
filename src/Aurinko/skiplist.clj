@@ -5,97 +5,105 @@
 
 (def ^:const FILE-HDR (int 8)) ; file header: number of levels, chance
 (def ^:const PTR-SIZE (int 4)) ; every pointer in the file is an integer
-(def ^:const ENTRY    (int 12)) ; every entry has integer validity, key and value
+(def ^:const NODE    (int 8)) ; every NODE has integer key and value
 
 (defprotocol SkipListP
-  (cut-lvl [this k cmp lvl ptr])
-  (cut [this k cmp])
-  (kv [this k v cmp])
-  (x [this k cmp])
-  (k [this k cmp]))
+  (rand-lvl [this])
+  (head     [this])
+  (at-node  [this n])
+  (node     [this n])
+  (cut-lvl  [this lvl begin-from k])
+  (cutlist  [this k])
+  (kv-after [this k v node top-lvl])
+  (kv       [this k v])
+  (k        [this k]))
 
-(deftype SkipList [path levels chance fc ^{:unsynchronized-mutable true} file] SkipListP
-  (cut-lvl [this k cmp lvl ptr]
-           (loop [result '()
-                  prev-ptr ptr
-                  curr-ptr ptr]
-             (if (= curr-ptr 0)
-               result
-               (do
-                 (.position ^MappedByteBuffer file curr-ptr)
-                 (let [valid   (.getInt ^MappedByteBuffer file)
-                       key     (.getInt ^MappedByteBuffer file)
-                       val     (.getInt ^MappedByteBuffer file)
-                       lvl-ptr (.getInt ^MappedByteBuffer (.position ^MappedByteBuffer file (+ ptr (* lvl PTR-SIZE))))]
-                   (if (= valid 1)
-                     (cond
-                       (= key k)
-                       (recur (conj result {:prev-ptr prev-ptr :ptr curr-ptr :val val :lvl lvl})
-                              curr-ptr lvl-ptr)
-                       (< key k)
-                       (recur result curr-ptr lvl-ptr)
-                       (> key k)
-                       (if (empty? result)
-                         (conj result {:ptr prev-ptr})
-                         result))
-                     (recur result curr-ptr lvl-ptr)))))))
-  (cut [this k cmp]
-       (loop [lvl-results '()
-              lvl (dec levels)
-              ptr (int 0)]
-         (let [lvl-result (cut-lvl this k cmp lvl ptr)]
-           (if (or (= lvl 0) (empty? lvl-results))
-             lvl-results
-             (recur (conj lvl-results lvl-result) (dec levels) (int (:ptr (first lvl-results))))))))
-             
-  (kv [this k v cmp]
-      (let [pos (int (.limit ^MappedByteBuffer file))]
-        (set! file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE
-                     0 (+ (.limit ^MappedByteBuffer file) (+ ENTRY (* PTR-SIZE levels)))))
-        (.position ^MappedByteBuffer file pos)
-        (.putInt ^MappedByteBuffer file 1)
-        (.putInt ^MappedByteBuffer file k)
-        (.putInt ^MappedByteBuffer file v)
-        (let [cutlist (cut this k cmp)
-              duplicate (remove nil? (for [[lvl lvl-result] (map-indexed cutlist)]
-                                       (when (filter #(contains? % :val) lvl-result)
-                                         lvl)))
-              insert-fun (fn [lvl ptr]
-                           (let [lvl-pos (+ ptr (* PTR-SIZE lvl))
-                                 lvl-ptr-val (.getInt ^MappedByteBuffer (.position ^MappedByteBuffer file lvl-pos))]
-                             (.putInt ^MappedByteBuffer (.position ^MappedByteBuffer file (+ pos (* PTR-SIZE lvl))) lvl-ptr-val) ; new->next = old->next
-                             (.putInt ^MappedByteBuffer (.position ^MappedByteBuffer file lvl-pos) pos)))] ; old->next = new
-          (if duplicate
-            (doseq [[lvl lvl-cut] (map-indexed cutlist)]
-              (insert-fun lvl (:ptr (last lvl-cut))))
-            (loop [lvl 0
-                   level-chance (double 1)]
-              (when (< (Math/random) level-chance)
-                (insert-fun lvl (:ptr (last (nth cutlist lvl))))
-                (recur (inc lvl) (* level-chance chance))))))))
-  (x [this k cmp]
-     (doseq [lvl (cut this k cmp)]
-       (doseq [entry (filter #(contains? % :val) lvl)]
-         (let [{:keys [prev-ptr ptr lvl]} entry
-               next-ptr (.getInt ^MappedByteBuffer (.position ^MappedByteBuffer file (+ ptr (* lvl PTR-SIZE))))]
-           (.putInt ^MappedByteBuffer (.position ^MappedByteBuffer file (+ prev-ptr ENTRY (* lvl PTR-SIZE))) next-ptr)))))
-  (k [this k cmp]
-     (doseq [lvl (cut this k cmp)]
-       (loop [result lvl]
-         (let [found (first result)]
-           (if (contains? found :val)
-             (.getInt ^MappedByteBuffer (.position ^MappedByteBuffer file (+ 8 (:ptr found))))
-             (recur (rest result))))))))
-
+(deftype SkipList [path levels P fc ^{:unsynchronized-mutable true} file] SkipListP
+  (rand-lvl [this]
+            (loop [lvl 1]
+              (if (and (< lvl levels) (< (Math/random) P))
+                (recur (inc lvl))
+                lvl)))
+  (head [this]
+        (.position file FILE-HDR)
+        (vec (map (.getInt file) (range levels))))
+  (at-node [this n]
+           (.position file (+ FILE-HDR
+                             (* n (+ (* PTR-SIZE levels) NODE)))))
+  (node [this n]
+        (at-node this n)
+        (let [ret {:n n :k (.getInt file) :v (.getInt file) :lvls (vec (map (fn [_] (.getInt file)) (range levels)))}]
+          (prn "node" ret)
+          ret))
+  (cut-lvl [this lvl begin-from k]
+           (loop [matches (transient [])
+                  n begin-from]
+             (prn "cut-lvl loop" n)
+             (let [node (node this n)
+                   lvl-ptr (nth (:lvls node) lvl)]
+               (cond
+                 (< (:k node) k)
+                 (if (not= lvl-ptr 0)
+                   (recur matches lvl-ptr)
+                   {:n n :matches (persistent! matches)})
+                 (= (:k node) k)
+                 (if (not= lvl-ptr 0)
+                   (recur (conj! matches node) lvl-ptr)
+                   {:n n :matches (persistent! matches)})
+                 (> (:k node) k)
+                 {:n n :matches (persistent! matches)}))))
+  (cutlist [this k]
+           (loop [lvl (dec levels)
+                  cut (transient [])
+                  curr-node 0]
+             (if (> lvl -1)
+               (let [cut-lvl (cut-lvl this lvl curr-node k)]
+                 (conj! cut cut-lvl)
+                 (recur (dec lvl) cut (:n cut-lvl)))
+               (persistent! cut))))
+  (kv-after [this k v node top-lvl]
+            (prn "kv-after" k v node top-lvl)
+            (let [new-node-pos (.limit file)
+                  new-node-num (quot (- (.limit file) FILE-HDR) (+ NODE (* levels PTR-SIZE)))]
+              (set! file (.map fc FileChannel$MapMode/READ_WRITE
+                           0 (+ (.limit file) (+ NODE (* PTR-SIZE levels)))))
+              (.position file new-node-pos)
+              (prn "put" k v)
+              (.putInt file k)
+              (.putInt file v)
+              (doseq [lvl (range top-lvl)]
+                (at-node this node)
+                (let [lvl-ptr-pos (+ (.position file) NODE (* PTR-SIZE lvl))]
+                  (.position file lvl-ptr-pos)
+                  (let [lvl-ptr (.getInt file)]
+                    (.putInt (.position file lvl-ptr-pos) new-node-num)
+                    (.putInt (.position file (+ new-node-pos NODE (* PTR-SIZE lvl))) lvl-ptr))))))
+  (kv [this k v]
+      (let [cut (cutlist this k)
+            match-node (ffirst (for [cut-lvl cut]
+                                 (for [lvl-match (:matches cut-lvl)]
+                                   (when-not (empty? lvl-match)
+                                     lvl-match))))]
+        (prn "kv" cut match-node)
+        (if (nil? match-node)
+          (kv-after this k v (:n (last cut)) (rand-lvl this))
+          (kv-after this k v match-node (last (:lvls match-node))))))
+  (k [this k]
+     (flatten (for [cut-lvl (cutlist this k)]
+                (for [lvl-match (:matches cut-lvl)]
+                  (when-not (empty? lvl-match) lvl-match))))))
+  
 (defn open [path]
-  (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
+  (let [fc   (.getChannel (RandomAccessFile. path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))]
-    (SkipList. path (int (.getInt ^MappedByteBuffer file))
-              (quot 1 (int (.getInt ^MappedByteBuffer file))) fc file)))
+    (SkipList. path (int (.getInt file))
+              (/ (int (.getInt file))) fc file)))
 
 (defn new [path levels chance]
-  (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
-        file (.map fc FileChannel$MapMode/READ_WRITE 0 (+ FILE-HDR (* PTR-SIZE levels)))]
-    (.putInt ^MappedByteBuffer file levels)
-    (.putInt ^MappedByteBuffer file chance)
+  (let [fc   (.getChannel (RandomAccessFile. path "rw"))
+        file (.map fc FileChannel$MapMode/READ_WRITE 0 (+ FILE-HDR NODE (* PTR-SIZE levels)))]
+    (.putInt file levels)
+    (.putInt file chance)
+    (doseq [l (range (+ 2 levels))]
+      (.putInt file 0))
     (open path)))
