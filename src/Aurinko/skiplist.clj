@@ -32,24 +32,23 @@
                              (* n (+ (* PTR-SIZE levels) NODE)))))
   (node [this n]
         (at-node this n)
-        (let [ret {:n n :k (.getInt file) :v (.getInt file) :lvls (vec (map (fn [_] (.getInt file)) (range levels)))}]
-          (prn "node" ret)
-          ret))
+        {:n n :k (.getInt file) :v (.getInt file) :lvls (vec (map (fn [_] (.getInt file)) (range levels)))})
   (cut-lvl [this lvl begin-from k]
            (loop [matches (transient [])
                   n begin-from]
-             (prn "cut-lvl loop" n)
+             (prn "cutting level" lvl n)
              (let [node (node this n)
                    lvl-ptr (nth (:lvls node) lvl)]
+               (prn "node" node "lvl-ptr" lvl-ptr)
                (cond
                  (< (:k node) k)
                  (if (not= lvl-ptr 0)
-                   (recur matches lvl-ptr)
+                   (do (prn "< k") (recur matches lvl-ptr))
                    {:n n :matches (persistent! matches)})
                  (= (:k node) k)
                  (if (not= lvl-ptr 0)
-                   (recur (conj! matches node) lvl-ptr)
-                   {:n n :matches (persistent! matches)})
+                   (do (prn "= k") (recur (conj! matches node) lvl-ptr))
+                   {:n n :matches (persistent! (conj! matches node))})
                  (> (:k node) k)
                  {:n n :matches (persistent! matches)}))))
   (cutlist [this k]
@@ -62,13 +61,11 @@
                  (recur (dec lvl) cut (:n cut-lvl)))
                (persistent! cut))))
   (kv-after [this k v node top-lvl]
-            (prn "kv-after" k v node top-lvl)
             (let [new-node-pos (.limit file)
                   new-node-num (quot (- (.limit file) FILE-HDR) (+ NODE (* levels PTR-SIZE)))]
               (set! file (.map fc FileChannel$MapMode/READ_WRITE
                            0 (+ (.limit file) (+ NODE (* PTR-SIZE levels)))))
               (.position file new-node-pos)
-              (prn "put" k v)
               (.putInt file k)
               (.putInt file v)
               (doseq [lvl (range top-lvl)]
@@ -78,16 +75,16 @@
                   (let [lvl-ptr (.getInt file)]
                     (.putInt (.position file lvl-ptr-pos) new-node-num)
                     (.putInt (.position file (+ new-node-pos NODE (* PTR-SIZE lvl))) lvl-ptr))))))
-  (kv [this k v]
-      (let [cut (cutlist this k)
-            match-node (ffirst (for [cut-lvl cut]
-                                 (for [lvl-match (:matches cut-lvl)]
-                                   (when-not (empty? lvl-match)
-                                     lvl-match))))]
-        (prn "kv" cut match-node)
-        (if (nil? match-node)
-          (kv-after this k v (:n (last cut)) (rand-lvl this))
-          (kv-after this k v match-node (last (:lvls match-node))))))
+  (kv [this key val]
+      (let [cut (cutlist this key)
+            match (first (k this key))]
+        (if (nil? match)
+          (do
+            (prn "insert after" (:n (last cut)))
+            (kv-after this key val (:n (last cut)) (rand-lvl this)))
+          (do
+            (prn "insert after" (:n match) "up to lvl" (- levels (count (filter zero? (:lvls match)))))
+            (kv-after this key val (:n match) (- levels (count (filter zero? (:lvls match)))))))))
   (k [this k]
      (flatten (for [cut-lvl (cutlist this k)]
                 (for [lvl-match (:matches cut-lvl)]
