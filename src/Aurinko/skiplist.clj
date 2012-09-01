@@ -77,9 +77,9 @@
                     (.putInt (.position file (+ new-node-pos NODE (* PTR-SIZE lvl))) lvl-ptr))))))
   (kv [this key val]
       (let [cut (cutlist this key)
-            match (first (k this key))]
+            match (last (k this key))]
         (if (nil? match)
-          (kv-after this key val (:n (first cut)) (rand-lvl this))
+          (kv-after this key val (:n (last cut)) (rand-lvl this))
           (kv-after this key val (:n match) (- levels (count (filter zero? (:lvls match))))))))
   (k [this k]
      (flatten (for [cut-lvl (cutlist this k)]
