@@ -35,22 +35,21 @@
         {:n n :k (.getInt file) :v (.getInt file) :lvls (vec (map (fn [_] (.getInt file)) (range levels)))})
   (cut-lvl [this lvl begin-from k]
            (loop [matches (transient [])
+                  prev-n begin-from
                   n begin-from]
-             (prn "cutting level" lvl n)
              (let [node (node this n)
                    lvl-ptr (nth (:lvls node) lvl)]
-               (prn "node" node "lvl-ptr" lvl-ptr)
                (cond
                  (< (:k node) k)
                  (if (not= lvl-ptr 0)
-                   (do (prn "< k") (recur matches lvl-ptr))
+                   (recur matches n lvl-ptr)
                    {:n n :matches (persistent! matches)})
                  (= (:k node) k)
                  (if (not= lvl-ptr 0)
-                   (do (prn "= k") (recur (conj! matches node) lvl-ptr))
+                   (recur (conj! matches node) n lvl-ptr)
                    {:n n :matches (persistent! (conj! matches node))})
                  (> (:k node) k)
-                 {:n n :matches (persistent! matches)}))))
+                 {:n prev-n :matches (persistent! matches)}))))
   (cutlist [this k]
            (loop [lvl (dec levels)
                   cut (transient [])
@@ -79,16 +78,11 @@
       (let [cut (cutlist this key)
             match (first (k this key))]
         (if (nil? match)
-          (do
-            (prn "insert after" (:n (last cut)))
-            (kv-after this key val (:n (last cut)) (rand-lvl this)))
-          (do
-            (prn "insert after" (:n match) "up to lvl" (- levels (count (filter zero? (:lvls match)))))
-            (kv-after this key val (:n match) (- levels (count (filter zero? (:lvls match)))))))))
+          (kv-after this key val (:n (first cut)) (rand-lvl this))
+          (kv-after this key val (:n match) (- levels (count (filter zero? (:lvls match))))))))
   (k [this k]
      (flatten (for [cut-lvl (cutlist this k)]
-                (for [lvl-match (:matches cut-lvl)]
-                  (when-not (empty? lvl-match) lvl-match))))))
+                (filter #(not (empty? %)) (:matches cut-lvl))))))
   
 (defn open [path]
   (let [fc   (.getChannel (RandomAccessFile. path "rw"))
