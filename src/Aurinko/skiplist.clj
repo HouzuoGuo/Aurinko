@@ -40,37 +40,54 @@
           (prn "insert" v)
           (let [empty-list? (= (.limit file) FILE-HDR)
                 new-node-pos (.limit file)
-                new-node-num (quot (- (.limit file) FILE-HDR) (+ NODE (* levels PTR-SIZE)))]
+                new-node-num (quot (- (.limit file) FILE-HDR) (+ NODE (* levels PTR-SIZE)))
+                top-lvl (loop [lvl 0]
+                              (if (and (< lvl (dec levels)) (< (Math/random) P))
+                                (recur (inc lvl))
+                                lvl))]
             (set! file (.map fc FileChannel$MapMode/READ_WRITE
                          0 (+ (.limit file) NODE (* PTR-SIZE levels))))
-            (if empty-list?
+            (if empty-list? ; make first node
               (do
                 (.position file FILE-HDR)
                 (.putInt file v)
                 (doseq [i (range levels)]
                   (.putInt file NIL)))
-              (let [top-lvl (loop [lvl 0]
-                              (if (and (< lvl (dec levels)) (< (Math/random) P))
-                                (recur (inc lvl))
-                                lvl))]
-                (.position file new-node-pos)
-                (.putInt file v)
-                (doseq [v (range levels)]
-                  (.putInt file NIL))
-                (loop [lvl top-lvl
-                       node-num 0]
-                  (when (> lvl -1)
-                    (let [lvl-cut (cut-lvl this v lvl node-num)
-                          last-lvl-node (:n (:node lvl-cut))]
-                      (at this last-lvl-node)
-                      (let [ptr-pos (+ (.position file) NODE (* PTR-SIZE lvl))
-                            old-node-num (do (.position file ptr-pos) (.getInt file))]
-                        (prn "last node" (:node lvl-cut) "at level" lvl "old pointer" old-node-num "new pointer" new-node-num)
-                        (.position file ptr-pos)
-                        (.putInt file new-node-num)
-                        (.position file (+ new-node-pos NODE (* PTR-SIZE lvl)))
-                        (.putInt file old-node-num))
-                      (recur (dec lvl) last-lvl-node)))))))))
+              (let [first-node (node-at this 0)]
+                (if (= (cmp-fun (:v first-node) v) 1) ; replace first node
+                  (let [equal-top (- levels (count (filter #(= % -1) (:lvls first-node))))]
+                    (prn "replacing first node up until level" equal-top)
+                    (.position file FILE-HDR)
+                    (.putInt file v)
+                    (doseq [v (range (max equal-top 1))]
+                      (.putInt file new-node-num))
+                    (doseq [v (range (- levels (max equal-top 1)))]
+                      (.putInt file NIL))
+                    (.position file new-node-pos)
+                    (.putInt file (:v first-node))
+                    (doseq [v (range equal-top)]
+                      (.putInt file (nth (:lvls first-node) v)))
+                    (doseq [v (range (- levels equal-top))]
+                      (.putInt file NIL)))
+                  (do
+                    (.position file new-node-pos)
+                    (.putInt file v)
+                    (doseq [v (range levels)]
+                      (.putInt file NIL))
+                    (loop [lvl top-lvl
+                           node-num 0]
+                      (when (> lvl -1)
+                        (let [lvl-cut (cut-lvl this v lvl node-num)
+                              last-lvl-node (:n (:node lvl-cut))]
+                          (at this last-lvl-node)
+                          (let [ptr-pos (+ (.position file) NODE (* PTR-SIZE lvl))
+                                old-node-num (do (.position file ptr-pos) (.getInt file))]
+                            (prn "last node" (:node lvl-cut) "at level" lvl "old pointer" old-node-num "rewrite pointer position" ptr-pos "to new node" new-node-num)
+                            (.position file ptr-pos)
+                            (.putInt file new-node-num)
+                            (.position file (+ new-node-pos NODE (* PTR-SIZE lvl)))
+                            (.putInt file old-node-num))
+                          (recur (dec lvl) last-lvl-node)))))))))))
        
 (defn open [path cmp-fun]
   (let [fc   (.getChannel (RandomAccessFile. path "rw"))
