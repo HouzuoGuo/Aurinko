@@ -35,7 +35,7 @@
                      (= cmp-result 0)
                      (recur next-node-num curr-node (conj! matches curr-node))
                      (= cmp-result 1)
-                     {:prev prev-node :node curr-node :matches (persistent! matches)})))))
+                     {:prev prev-node :node prev-node :matches (persistent! matches)})))))
   (insert [this v]
           (prn "insert" v)
           (let [empty-list? (= (.limit file) FILE-HDR)
