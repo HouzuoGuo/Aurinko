@@ -52,41 +52,43 @@
             (if empty-list? ; make first node
               (do
                 (.position ^MappedByteBuffer file FILE-HDR)
-                (.putInt ^MappedByteBuffer file v)
+                (.putInt   ^MappedByteBuffer file v)
                 (doseq [i (range levels)]
                   (.putInt ^MappedByteBuffer file NIL)))
               (let [first-node (node-at this 0)]
                 (if (= (cmp-fun (:v first-node) v) 1) ; replace first node
                   (let [equal-top (int (- levels (count (filter #(= % -1) (:lvls first-node)))))]
                     (.position ^MappedByteBuffer file FILE-HDR)
-                    (.putInt ^MappedByteBuffer file v)
+                    (.putInt   ^MappedByteBuffer file v)
                     (doseq [v (range (max equal-top 1))]
                       (.putInt ^MappedByteBuffer file new-node-num))
                     (doseq [v (range (- levels (max equal-top 1)))]
                       (.putInt ^MappedByteBuffer file NIL))
                     (.position ^MappedByteBuffer file new-node-pos)
-                    (.putInt ^MappedByteBuffer file (:v first-node))
+                    (.putInt   ^MappedByteBuffer file (:v first-node))
                     (doseq [v (range equal-top)]
                       (.putInt ^MappedByteBuffer file (nth (:lvls first-node) v)))
                     (doseq [v (range (- levels equal-top))]
                       (.putInt ^MappedByteBuffer file NIL)))
                   (do ; insert after
                     (.position ^MappedByteBuffer file new-node-pos)
-                    (.putInt ^MappedByteBuffer file v)
+                    (.putInt   ^MappedByteBuffer file v)
                     (doseq [v (range levels)]
                       (.putInt ^MappedByteBuffer file NIL))
                     (loop [lvl top-lvl
-                           node-num (int 0)]
+                           node-num (int 0)
+                           restarted false] ; when a match is found, the loop needs to restart  
                       (when (> lvl -1)
                         (let [lvl-cut       (cut-lvl this v lvl node-num)
+                              matches       (:matches lvl-cut)
                               last-lvl-node (int (:n (:node lvl-cut)))]
                           (at this last-lvl-node)
                           (let [ptr-pos (int (+ (.position ^MappedByteBuffer file) NODE (* PTR-SIZE lvl)))
                                 old-node-num (int (do (.position ^MappedByteBuffer file ptr-pos) (.getInt ^MappedByteBuffer file)))]
                             (.position ^MappedByteBuffer file ptr-pos)
-                            (.putInt ^MappedByteBuffer file new-node-num)
+                            (.putInt   ^MappedByteBuffer file new-node-num)
                             (.position ^MappedByteBuffer file (+ new-node-pos NODE (* PTR-SIZE lvl)))
-                            (.putInt ^MappedByteBuffer file old-node-num))
+                            (.putInt   ^MappedByteBuffer file old-node-num))
                           (do
                             (prn "recur from lvl" lvl "next node" last-lvl-node)
                             (recur (dec lvl) last-lvl-node)))))))))))

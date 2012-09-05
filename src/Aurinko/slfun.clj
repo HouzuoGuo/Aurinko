@@ -27,6 +27,7 @@
     (prn (sl/lookup list 80))
     (prn (sl/lookup list 90))
     (prn (sl/lookup list 100))
-    (prn (sl/lookup list 110))))
+    (prn (sl/lookup list 110))
+    (prn (sl/lookup list 120))))
     ;(time (doseq [i (range 1000)]
      ;       (sl/insert list (rand-int 100000))))))
