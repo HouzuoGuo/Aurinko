@@ -27,7 +27,7 @@
                   prev-node     (node-at this begin-from)
                   matches       (transient [])]
              (if (= curr-node-num NIL)
-                 {:prev prev-node :node prev-node :matches (persistent! matches)}
+                 {:node prev-node :matches (persistent! matches)}
                  (let [curr-node     (node-at this curr-node-num)
                        next-node-num (int (nth (:lvls curr-node) lvl))
                        cmp-result    (cmp-fun (:v curr-node) v)]
@@ -37,9 +37,8 @@
                      (= cmp-result 0)
                      (recur next-node-num curr-node (conj! matches curr-node))
                      (= cmp-result 1)
-                     {:prev prev-node :node prev-node :matches (persistent! matches)})))))
+                     {:node prev-node :matches (persistent! matches)})))))
   (insert [this v]
-          (prn "insert" v)
           (let [empty-list?  (= (.limit ^MappedByteBuffer file) FILE-HDR)
                 new-node-pos (int (.limit ^MappedByteBuffer file))
                 new-node-num (int (quot (- (.limit ^MappedByteBuffer file) FILE-HDR) (+ NODE (* levels PTR-SIZE))))
@@ -75,23 +74,27 @@
                     (.putInt   ^MappedByteBuffer file v)
                     (doseq [v (range levels)]
                       (.putInt ^MappedByteBuffer file NIL))
-                    (loop [lvl top-lvl
+                    (loop [lvl      top-lvl
                            node-num (int 0)
-                           restarted false] ; when a match is found, the loop needs to restart  
+                           restarted false] ; when a match is found, the loop needs to restart, new node must reach as high as the matching node
                       (when (> lvl -1)
                         (let [lvl-cut       (cut-lvl this v lvl node-num)
                               matches       (:matches lvl-cut)
                               last-lvl-node (int (:n (:node lvl-cut)))]
-                          (at this last-lvl-node)
-                          (let [ptr-pos (int (+ (.position ^MappedByteBuffer file) NODE (* PTR-SIZE lvl)))
-                                old-node-num (int (do (.position ^MappedByteBuffer file ptr-pos) (.getInt ^MappedByteBuffer file)))]
-                            (.position ^MappedByteBuffer file ptr-pos)
-                            (.putInt   ^MappedByteBuffer file new-node-num)
-                            (.position ^MappedByteBuffer file (+ new-node-pos NODE (* PTR-SIZE lvl)))
-                            (.putInt   ^MappedByteBuffer file old-node-num))
-                          (do
-                            (prn "recur from lvl" lvl "next node" last-lvl-node)
-                            (recur (dec lvl) last-lvl-node)))))))))))
+                          (if (and (not restarted) (not (empty? matches)))
+                            (do
+                              (prn "restarting" matches "up to level" (max (dec (count (filter #(not= % NIL) (:lvls (first matches))))) 0) (:n (last matches)))
+                              (recur (max 0 (dec (count (filter #(not= % NIL) (:lvls (first matches)))))) (:n (last matches)) true))
+                            (do
+                              (prn "inserting" v "at lvl" lvl "at node" last-lvl-node)
+                              (at this last-lvl-node)
+                              (let [ptr-pos (int (+ (.position ^MappedByteBuffer file) NODE (* PTR-SIZE lvl)))
+                                    old-node-num (int (do (.position ^MappedByteBuffer file ptr-pos) (.getInt ^MappedByteBuffer file)))]
+                                (.position ^MappedByteBuffer file ptr-pos)
+                                (.putInt   ^MappedByteBuffer file new-node-num)
+                                (.position ^MappedByteBuffer file (+ new-node-pos NODE (* PTR-SIZE lvl)))
+                                (.putInt   ^MappedByteBuffer file old-node-num))
+                              (recur (dec lvl) last-lvl-node restarted))))))))))))
   (lookup [this v]
           (loop [lvl (dec levels)
                  node-num (int 0)]
