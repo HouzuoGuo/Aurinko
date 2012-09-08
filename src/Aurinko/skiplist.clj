@@ -39,13 +39,16 @@
                      (= cmp-result 1)
                      {:node prev-node :matches (persistent! matches)})))))
   (insert [this v]
+          (prn "inserting" v)
           (let [empty-list?  (= (.limit ^MappedByteBuffer file) FILE-HDR)
                 new-node-pos (int (.limit ^MappedByteBuffer file))
                 new-node-num (int (quot (- (.limit ^MappedByteBuffer file) FILE-HDR) (+ NODE (* levels PTR-SIZE))))
-                top-lvl      (int (loop [lvl (int 0)]
-                                    (if (and (< lvl (dec levels)) (< (Math/random) P))
-                                      (recur (inc lvl))
-                                      lvl)))]
+                top-lvl      1
+                ;(int (loop [lvl (int 0)]
+                 ;                   (if (and (< lvl (dec levels)) (< (Math/random) P))
+                  ;                    (recur (inc lvl))
+                   ;                   lvl)))
+                ]
             (set! file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE
                          0 (+ (.limit ^MappedByteBuffer file) NODE (* PTR-SIZE levels))))
             (if empty-list? ; make first node
@@ -74,36 +77,31 @@
                     (.putInt   ^MappedByteBuffer file v)
                     (doseq [v (range levels)]
                       (.putInt ^MappedByteBuffer file NIL))
-                    (loop [lvl      top-lvl
-                           node-num (int 0)
-                           restarted false] ; when a match is found, the loop needs to restart, new node must reach as high as the matching node
-                      (when (> lvl -1)
-                        (let [lvl-cut       (cut-lvl this v lvl node-num)
-                              matches       (:matches lvl-cut)
-                              last-lvl-node (int (:n (:node lvl-cut)))]
-                          (if (and (not restarted) (not (empty? matches)))
+                    (let [match (lookup this v)]
+                      ; If new node value already exists, the new node must reach as high as the match reaches
+                      (loop [lvl      (if (empty? match) top-lvl (int (max 0 (dec (count (filter #(not= % -1) (:lvls (last match))))))))
+                             node-num (if (empty? match) (int 0) (int (:n (last match))))]
+                        (prn "match?" match "loop form level" lvl "node" node-num)
+                        (when (> lvl -1)
+                          (let [lvl-cut       (cut-lvl this v lvl node-num)
+                                last-lvl-node (int (:n (:node lvl-cut)))]
                             (do
-                              (prn "restarting" matches "up to level" (max (dec (count (filter #(not= % NIL) (:lvls (first matches))))) 0) (:n (last matches)))
-                              (recur (max 0 (dec (count (filter #(not= % NIL) (:lvls (first matches)))))) (:n (last matches)) true))
-                            (do
-                              (prn "inserting" v "at lvl" lvl "at node" last-lvl-node)
                               (at this last-lvl-node)
                               (let [ptr-pos (int (+ (.position ^MappedByteBuffer file) NODE (* PTR-SIZE lvl)))
                                     old-node-num (int (do (.position ^MappedByteBuffer file ptr-pos) (.getInt ^MappedByteBuffer file)))]
                                 (.position ^MappedByteBuffer file ptr-pos)
                                 (.putInt   ^MappedByteBuffer file new-node-num)
                                 (.position ^MappedByteBuffer file (+ new-node-pos NODE (* PTR-SIZE lvl)))
-                                (.putInt   ^MappedByteBuffer file old-node-num))
-                              (recur (dec lvl) last-lvl-node restarted))))))))))))
+                              (.putInt   ^MappedByteBuffer file old-node-num))
+                              (recur (dec lvl) last-lvl-node))))))))))))
   (lookup [this v]
           (loop [lvl (dec levels)
-                 node-num (int 0)]
-            (when (> lvl -1)
-              (let [lvl-cut (cut-lvl this v lvl node-num)
-                    matches (:matches lvl-cut)]
-                (if (empty? matches)
-                  (recur (dec lvl) (int (:n (:node lvl-cut))))
-                  matches))))))
+                 node-num (int 0)
+                 matches nil]
+            (if (> lvl -1)
+              (let [lvl-cut (cut-lvl this v lvl node-num)]
+                (recur (dec lvl) (int (:n (:node lvl-cut))) (:matches lvl-cut)))
+              matches))))
 (defn open [path cmp-fun]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))]
