@@ -22,13 +22,14 @@
     (sl/insert list 50)
     (sl/insert list 50)
     
-    (prn (sl/lookup list 10))
-    (prn (sl/lookup list 20))
-    (prn (sl/lookup list 30))
-    (prn (sl/lookup list 40))
-    (prn (sl/lookup list 50))
-    
-    (time (doseq [i (range 1000)]
-            (sl/insert list (rand-int 1000))))
-    (time (doseq [i (range 1000)]
-            (sl/lookup list (rand-int 1000))))))
+    (prn (sl/lookup list 10 (fn [_] true)))
+    (prn (sl/lookup list 20 (fn [_] true)))
+    (prn (sl/lookup list 30 (fn [_] true)))
+    (prn (sl/lookup list 40 (fn [_] true)))
+    (prn (sl/lookup list 50 (fn [_] true)))
+;    
+;    (time (doseq [i (range 1000)]
+;            (sl/insert list (rand-int 1000))))
+;    (time (doseq [i (range 1000)]
+;            (sl/lookup list (rand-int 1000) (fn [_] true))))
+    ))

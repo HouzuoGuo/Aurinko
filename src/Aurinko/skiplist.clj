@@ -6,38 +6,42 @@
 
 (def ^:const FILE-HDR (int 8))  ; file header: number of levels, chance
 (def ^:const PTR-SIZE (int 4))  ; every pointer in the file is an integer
-(def ^:const NODE     (int 4))  ; every node has integer key and value
+(def ^:const NODE     (int 8))  ; every node has integer validity (0 - invalid, 1 - valid) and node value
 (def ^:const NIL      (int -1)) ; nil pointer
 
 (defprotocol SkipListP
   (at      [this node-num] "Put file handle at the specified node's position")
   (node-at [this node-num] "Return the node's number, level pointers and value")
   (cut-lvl [this v lvl begin-from] "Cut a level from the specified node number, look for value matches")
-  (insert [this v] "Put a value into list")
-  (lookup [this v] "Lookup all nodes that contain the value"))
+  (insert [this v]        "Put a value into list")
+  (lookup [this v filt] "Lookup all nodes that contain the value")
+  (x      [this v filt] "Remove a value"))
 
 (deftype SkipList [path levels P fc ^{:unsynchronized-mutable true} file cmp-fun] SkipListP
   (at [this node-num]
       (.position ^MappedByteBuffer file (+ FILE-HDR (* node-num (+ NODE (* PTR-SIZE levels))))))
   (node-at [this node-num]
            (at this node-num)
-           {:n node-num :v (.getInt ^MappedByteBuffer file) :lvls (vec (map (fn [_] (.getInt ^MappedByteBuffer file)) (range levels)))})
+           {:n node-num :valid (= (.getInt ^MappedByteBuffer file) 1) :v (.getInt ^MappedByteBuffer file)
+            :lvls (vec (map (fn [_] (.getInt ^MappedByteBuffer file)) (range levels)))})
   (cut-lvl [this v lvl begin-from]
            (loop [curr-node-num (int begin-from)
                   prev-node     (node-at this begin-from)
                   matches       (transient [])]
              (if (= curr-node-num NIL)
-                 {:node prev-node :matches (persistent! matches)}
-                 (let [curr-node     (node-at this curr-node-num)
-                       next-node-num (int (nth (:lvls curr-node) lvl))
-                       cmp-result    (cmp-fun (:v curr-node) v)]
+               {:node prev-node :matches (persistent! matches)}
+               (let [curr-node     (node-at this curr-node-num)
+                     next-node-num (int (nth (:lvls curr-node) lvl))
+                     cmp-result    (cmp-fun (:v curr-node) v)]
+                 (if (:valid curr-node)
                    (cond
                      (= cmp-result -1) ; continue next if node value is less
                      (recur next-node-num curr-node matches)
                      (= cmp-result 0)  ; keep the node if matching 
                      (recur next-node-num curr-node (conj! matches curr-node))
                      (= cmp-result 1)  ; return when node value is greater
-                     {:node prev-node :matches (persistent! matches)})))))
+                     {:node prev-node :matches (persistent! matches)})
+                   (recur next-node-num curr-node matches))))))
   (insert [this v]
           (let [empty-list?  (= (.limit ^MappedByteBuffer file) FILE-HDR)
                 new-node-pos (int (.limit ^MappedByteBuffer file))
@@ -51,6 +55,7 @@
             (if empty-list? ; the new node is the only node
               (do ; write node value, all levels point to NIL
                 (.position ^MappedByteBuffer file FILE-HDR)
+                (.putInt   ^MappedByteBuffer file 1)
                 (.putInt   ^MappedByteBuffer file v)
                 (doseq [i (range levels)]
                   (.putInt ^MappedByteBuffer file NIL)))
@@ -58,6 +63,7 @@
                 (if (= (cmp-fun (:v first-node) v) 1) ; replace first node by the new node
                   (let [equal-top (int (- levels (count (filter #(= % -1) (:lvls first-node)))))]
                     (.position ^MappedByteBuffer file FILE-HDR)
+                    (.putInt   ^MappedByteBuffer file 1)
                     (.putInt   ^MappedByteBuffer file v)
                     (doseq [v (range (max equal-top 1))]
                       (.putInt ^MappedByteBuffer file new-node-num))
@@ -71,10 +77,11 @@
                       (.putInt ^MappedByteBuffer file NIL)))
                   (do ; insert the new node after another node
                     (.position ^MappedByteBuffer file new-node-pos)
+                    (.putInt   ^MappedByteBuffer file 1)
                     (.putInt   ^MappedByteBuffer file v)
                     (doseq [v (range levels)]
                       (.putInt ^MappedByteBuffer file NIL))
-                    (let [match (lookup this v)]
+                    (let [match (lookup this v (fn [_] true))]
                       ; If new node value already exists, the new node must reach as tall as the match reaches
                       (loop [lvl      (if (empty? match) top-lvl (int (max 0 (dec (count (filter #(not= % -1) (:lvls (last match))))))))
                              node-num (if (empty? match) (int 0) (int (:n (last match))))]
@@ -90,7 +97,7 @@
                                 (.position ^MappedByteBuffer file (+ new-node-pos NODE (* PTR-SIZE lvl))) ; at new node's level pointer
                                 (.putInt   ^MappedByteBuffer file old-node-num)) ; point it to the old node's pointer value
                               (recur (dec lvl) last-lvl-node))))))))))))
-  (lookup [this v]
+  (lookup [this v filt]
           (loop [lvl (dec levels)
                  node-num (int 0)
                  matches nil]
@@ -101,7 +108,8 @@
                        (if (> (count lvl-matches) (count matches))
                          lvl-matches
                          matches)))
-              matches))))
+              (filter filt matches))))
+  (x [this v filter]))
 (defn open [path cmp-fun]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))]
