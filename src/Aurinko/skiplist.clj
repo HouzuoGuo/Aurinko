@@ -106,6 +106,7 @@
                 (recur (dec lvl)
                        (int (if (empty? lvl-matches)
                               (:n (:node lvl-cut))
+                              ; Found match? Descend a level and scan from the first matching node
                               (:n (first lvl-matches))))
                        (if (> (count lvl-matches) (count matches))
                          lvl-matches

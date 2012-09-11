@@ -5,7 +5,8 @@
         [clojure.java.io :only [file]]))
 
 (defn -main [& args]
-  (let [list (sl/new "skiplist" 5 2 compare)]
+  (Thread/sleep 10000)
+  (let [list (sl/new "skiplist" 8 2 compare)]
     (sl/insert list 30)
     (sl/insert list 40)
     (sl/insert list 30)
