@@ -13,9 +13,15 @@
   (at      [this node-num] "Put file handle at the specified node's position")
   (node-at [this node-num] "Return the node's number, level pointers and value")
   (cut-lvl [this v lvl begin-from] "Cut a level from the specified node number, look for value matches")
-  (insert [this v]        "Put a value into list")
+  (insert [this v]      "Put a value into list")
   (lookup [this v filt] "Lookup all nodes that contain the value")
-  (x      [this v filt] "Remove a value"))
+  (x      [this v filt] "Remove a value")
+  (scan<  [this v] "Scan for values less than v")
+  (scan<= [this v] "Scan for values less or equal to v")
+  (scan>  [this v] "Scan for values greater than v")
+  (scan>= [this v] "Scan for values greater or equal to v")
+  (scan<> [this v] "Scan for values not equal to v")
+  (scan>< [this v1 v2] "Scan for values within range"))
 
 (deftype SkipList [path levels P fc ^{:unsynchronized-mutable true} file cmp-fun] SkipListP
   (at [this node-num]
@@ -115,7 +121,67 @@
   (x [this v filt]
      (doseq [match (filter #(and (filt %) (:valid %)) (lookup this v filt))]
        (at this (:n match))
-       (.putInt ^MappedByteBuffer file 0))))
+       (.putInt ^MappedByteBuffer file 0)))
+  (scan< [this v]
+         (loop [nodes (transient [])
+                next   (int 0)]
+           (if (= next NIL)
+             (persistent! nodes)
+             (let [node (node-at this next)]
+               (if (= -1 (cmp-fun (:v node) v))
+                 (recur (conj! nodes node) (int (first (:lvls node))))
+                 (persistent! nodes))))))
+  (scan<= [this v]
+         (loop [nodes (transient [])
+                next   (int 0)]
+           (if (= next NIL)
+             (persistent! nodes)
+             (let [node (node-at this next)]
+               (if (<= (cmp-fun (:v node) v) 0)
+                 (recur (conj! nodes node) (int (first (:lvls node))))
+                 (persistent! nodes))))))
+  (scan> [this v]
+         (let [start-from (lookup this v (fn [_] true))]
+           (if (or (nil? start-from) (empty? start-from))
+             []
+             (loop [nodes (transient [])
+                    next  (int (first (:lvls (first start-from))))]
+               (if (= next NIL)
+                 (persistent! nodes)
+                 (let [node (node-at this next)]
+                   (recur (conj! nodes node) (int (first (:lvls node))))))))))
+  (scan>= [this v]
+          (let [start-from (lookup this v (fn [_] true))]
+            (if (or (nil? start-from) (empty? start-from))
+              []
+              (loop [nodes (transient [(first start-from)])
+                     next  (int (first (:lvls (first start-from))))]
+                (if (= next NIL)
+                  (persistent! nodes)
+                  (let [node (node-at this next)]
+                    (recur (conj! nodes node) (int (first (:lvls node))))))))))
+  (scan<> [this v]
+          (loop [nodes (transient [])
+                 next   (int 0)]
+            (if (= next NIL)
+              (persistent! nodes)
+              (let [node (node-at this next)]
+                (recur (if (= 0 (cmp-fun (:v node) v))
+                         nodes
+                         (conj! nodes node))
+                       (int (first (:lvls node))))))))
+  (scan>< [this v1 v2]
+          (let [start-from (lookup this v1 (fn [_] true))]
+            (if (or (nil? start-from) (empty? start-from))
+              []
+              (loop [nodes (transient [(first start-from)])
+                     next  (int (first (:lvls (first start-from))))]
+                (if (= next NIL)
+                  (persistent! nodes)
+                  (let [node (node-at this next)]
+                    (if (= -1 (cmp-fun (:v node) v2))
+                      (recur (conj! nodes node) (int (first (:lvls node))))
+                      (persistent! nodes)))))))))
 (defn open [path cmp-fun]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))]
