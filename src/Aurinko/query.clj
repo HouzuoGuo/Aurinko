@@ -12,34 +12,37 @@
   "Throw an exception if any of the args is nil"
   (when (some nil? args) (throw (Exception. (str args": no enough arguments for op " op)))))
 
-(defn scan-eq [_ col stack]
-  "Lookup in a collection/result set"
-  (let [[limit val path source & _] stack
-        index-scan (fn [] (hash/k (col/index col path) val limit
-                                  #(doc-match? (col/by-pos col %) path val)))] ; avoid hash collision
-    (check-args :eq limit val path source)
-    (cons (set
-            (cond
-              (= source :col)
-              (if (nil? (col/index col path))
-                (let [result (for [doc (filter #(doc-match? % path val)
+(defn scan-eq
+  ([col stack]
+    "Lookup in a collection/result set"
+    (let [[limit val path source & _] stack
+          index-scan (fn [] (hash/k (col/index col path) val limit
+                                    #(doc-match? (col/by-pos col %) path val)))] ; avoid hash collision
+      (check-args :eq limit val path source)
+      (cons (set
+              (cond
+                (= source :col)
+                (if (nil? (col/index col path))
+                  (let [result (for [doc (filter #(doc-match? % path val)
                                                (col/all col))]
-                               (:_pos doc))]
-                  (if (= limit -1)
-                    result
-                    (take limit result)))
-                (index-scan))
-              (set? source)
-              (if (nil? (col/index col path))
+                                 (:_pos doc))]
+                    (if (= limit -1)
+                      result
+                      (take limit result)))
+                  (index-scan))
+                (set? source)
+                (if (nil? (col/index col path))
                 (let [result (filter #(doc-match? (col/by-pos col %) path val)
                                      source)]
                   (if (= limit -1)
                     result
                     (take limit result)))
                 (intersection source (index-scan)))
-              :else
-              (throw (Exception. (str "Expecting " source " to be :col or set")))))
-          (drop 4 stack))))
+                :else
+                (throw (Exception. (str "Expecting " source " to be :col or set")))))
+            (drop 4 stack))))
+  ([_ col stack]
+    (scan-eq col stack)))
 
 (defn scan-ineq [op col stack]
   "Range query in a collection/result set"
@@ -109,19 +112,20 @@
   (cons (set (for [doc (col/all col)] (:_pos doc))) stack))
 
 (defn q [col conds]
-  (loop [stack     '()
+  (loop [stack '()
          remaining conds]
     (let [thing (first remaining)]
-      (if (nil? thing) (vec stack)
+      (if (nil? thing)
+        (vec stack)
         (recur
           (if (and (keyword? thing) (not= thing :col))
             ((case thing
-               :eq                       scan-eq
-               (:ne :ge :gt :le :lt)     scan-ineq
+               :eq scan-eq
+               (:ne :ge :gt :le :lt) scan-ineq
                (:diff :intersect :union) two-sets
-               (:has :not-have)          path-check
-               (:asc :desc)              sorted
-               :all                      col2set
+               (:has :not-have) path-check
+               (:asc :desc) sorted
+               :all col2set
                (throw (Exception. (str thing ": not understood"))))
               (thing {:eq scan-eq :ge >= :gt > :le <= :lt < :ne not=
                       :diff difference :intersect intersection :union union

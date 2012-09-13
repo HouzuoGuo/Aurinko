@@ -35,7 +35,7 @@
    :q       (fn [p [name & conds]] (enQ p (fn [] (query/q          (db/col @db name) conds)) true))
    :select  (fn [p [name & conds]]
               (enQ p (fn [] (let [col (db/col @db name)]
-                              (for [result (query/q (db/col @db name) conds)]
+                              (for [result (query/q col conds)]
                                 (vec (for [pos result]
                                        (col/by-pos col pos)))))) true))
    :delete  (fn [p [name & conds]]
@@ -48,7 +48,17 @@
                               (doseq [result (query/q col conds)]
                                 (doseq [pos result]
                                   (col/update col
-                                              (func (col/by-pos col pos))))))) false))})
+                                              (func (col/by-pos col pos))))))) false))
+   :fastdelete (fn [p [name & poses]]
+                 (enQ p (fn [] (let [col (db/col @db name)]
+                                 (doseq [pos poses]
+                                   (col/delete col {:_pos pos})))) false))
+   :fastupdate (fn [p [name pos doc & _]]
+                 (enQ p (fn [] (col/update (db/col @db name) (assoc doc :_pos pos))) false))
+   :fastselect (fn [p [name & poses]]
+                 (enQ p (fn [] (let [col (db/col @db name)]
+                                 (vec (for [pos poses]
+                                        (col/by-pos col pos))))) true))})
 
 (defn -main [& args]
   (if (> (count args) 1)
