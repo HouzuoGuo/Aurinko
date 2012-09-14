@@ -15,12 +15,14 @@
 
 (deftype Db [dir ^{:unsynchronized-mutable true} cols] DbP
   (create [this name]
+          (save this)
           (when ((keyword name) cols)
             (throw (Exception. (str "collection " name " already exists"))))
           (if (.mkdirs (file (str dir fs/sep name)))
             (set! cols (assoc cols (keyword name) (col/open (str dir fs/sep name))))
             (throw (Exception. (str "failed to create directory for collection " name)))))
   (rename [this old new]
+          (save this)
           (when ((keyword new) cols)
             (throw (Exception. (str "new collection name " new " is already used"))))
           (when-not ((keyword old) cols)
@@ -30,16 +32,17 @@
           (set! cols (assoc (dissoc cols (keyword old))
                             (keyword new) (col/open (str dir fs/sep new)))))
   (delete [this name]
+          (save this)
           (when-not ((keyword name) cols)
             (throw (Exception. (str "collection " name " does not exist"))))
           (fs/rmrf (file dir name))
           (set! cols (dissoc cols (keyword name))))
   (compress [this name]
+            (save this)
             (if-let [c ((keyword name) cols)]
               (let [indexed (col/indexed c)
                     tmp-name (str (System/nanoTime))
                     tmp      (do (create this tmp-name) ((keyword tmp-name) cols))]
-                (save this)
                 (doseq [doc (col/all ((keyword name) cols))] (col/insert tmp doc))
                 (delete this name)
                 (rename this tmp-name name)
@@ -47,11 +50,11 @@
                   (doseq [i indexed] (col/index-path repaired i))))
               (throw (Exception. (str "collection " name " does not exist")))))
   (repair [this name]
+          (save this)
           (if-let [c ((keyword name) cols)]
             (let [indexed  (col/indexed c)
                   tmp-name (str (System/nanoTime))
                   tmp      (do (create this tmp-name) (col this tmp-name))]
-              (save this)
               (fs/lines (str dir fs/sep name fs/sep "log")
                         (fn [line]
                           (try
