@@ -5,7 +5,7 @@
 
 (defn all-docs [col]
   (let [docs (transient [])]
-    (col/all col #(conj! docs (dissoc % :_pos)))
+    (col/all col #(conj! docs %))
     (persistent! docs)))
 
 (deftest file2index
@@ -33,7 +33,8 @@
       ; insert - not indexed
       (col/insert c {:foo {:bar "spam"}})
       ; read all
-      (is (= (all-docs c)
+      (is (= (for [doc (all-docs c)]
+               (dissoc doc :_pos))
              [{:a {:b [1 2]} :c 3}
               {:a {:b [4 5]} :c 6}
               {:foo {:bar "spam"}}]))
@@ -51,7 +52,8 @@
       (col/update c (dissoc (second (all-docs c)) :a))
       ; update and grow
       (col/update c (assoc (nth (all-docs c) 2) :extra "abcdefghijklmnopqrstuvwxyz0123456789"))
-      (is (= (all-docs c)
+      (is (= (for [doc (all-docs c)]
+               (dissoc doc :_pos))
              [{:a {:b [8 9]} :c 3}
               {:c 6}
               {:foo {:bar "spam"} :extra "abcdefghijklmnopqrstuvwxyz0123456789"}]))

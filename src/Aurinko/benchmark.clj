@@ -9,8 +9,8 @@
         col1 (col/open "col1")]
     (prn "Warming up..")
     (doseq [v (range 20000)] (col/insert col0 {:tag v}))
-    (doseq [v (col/all col0)] (col/update col0 (assoc v :tag2 v)))
-    (doseq [v (col/all col0)] (col/delete col0 v))
+    (col/all col0 #(col/update col0 (assoc % :tag2 "a")))
+    (col/all col0 #(col/delete col0 %))
 
     (let [h (hash/new "hash" 12 100)]
       (prn "Hash - put 200k entries")
@@ -34,13 +34,13 @@
                               :action ["insert" "benchmark"]
                               :purpose "benchmark"})))
     (prn "Collection - update 20k documents (3 indexes)")
-    (time (doseq [v (col/all col1)] (col/update col1 (assoc v :action "u"))))
+    (time (col/all col1 #(col/update col1 (assoc % :action "u"))))
     (prn "Collection - update 20k documents (3 indexes, grow each document)")
     (time
-      (doseq [v (col/all col1)]
-        (col/update col1 (assoc v :extra "123456789012345678901234567890123456789012345678901234567890"))))
+      (col/all col1
+        #(col/update col1 (assoc % :extra "123456789012345678901234567890123456789012345678901234567890"))))
     (prn "Collection - read all 20k documents")
-    (time (col/all col1))
+    (time (col/all col1 (fn [_] true)))
     (prn "Collection - index 20k documents")
     (time (col/index-path col1 [:map :complex :data]))
     (prn "Query - index lookup 20k items")
@@ -66,6 +66,6 @@
                          :intersect
                          [:a1 :a2 :a3] :asc]))
     (prn "Collection - delete 20k documents")
-    (time (doseq [v (col/all col1)] (col/delete col1 v))))
+    (time (col/all col1 #(col/delete col1 %))))
   (fs/rmrf (file "col0"))
   (fs/rmrf (file "col1")))

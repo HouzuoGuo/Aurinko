@@ -3,7 +3,7 @@
   (:require (Aurinko [hash :as hash] [fs :as fs]) [clojure.string :as cstr])
   (:import (java.io File RandomAccessFile PrintWriter BufferedWriter FileWriter))
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
-           (java.nio MappedByteBuffer)))
+           (java.nio MappedByteBuffer BufferUnderflowException)))
 
 (def ^:const COL-HDR (int 4)) ; collection header - next insert pos
 (def ^:const DOC-HDR (int 8)) ; document header - valid (0 or 1), allocated room
@@ -127,11 +127,12 @@
                  EOF
                  (do
                    (when (> room DOC-MAX)
-                     (throw (Exception. (str "collection " dir " is corrupted, please repair collection"))))
+                     (throw (Exception. (str "collection " dir " could be corrupted, repair collection?"))))
                    (let [text (byte-array room)]
                      (.get ^MappedByteBuffer data ^bytes text)
-                     (if (= 1 valid)
+                     (when (= 1 valid)
                        (read-string (String. (byte-array (remove zero? text)))))))))
+             (catch BufferUnderflowException e EOF)
              (catch Exception e (.printStackTrace e))))
   (all [this fun]
        (loop [pos COL-HDR]
@@ -139,7 +140,8 @@
          (let [doc (by-pos this pos)
                next-pos (.position ^MappedByteBuffer data)]
            (when-not (= doc EOF)
-             (when-not (or (nil? doc) (empty? doc)) (fun doc))
+             (when-not (or (nil? doc) (empty? doc))
+               (fun doc))
              (recur next-pos)))))
   (save  [this]
          (doseq [i indexes] (hash/save (:hash i)))

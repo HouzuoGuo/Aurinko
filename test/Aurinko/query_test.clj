@@ -4,8 +4,6 @@
         [clojure.java.io :only [file]]))
 
 (.mkdir (file "col"))
-(.createNewFile (file "col/data"))
-(.createNewFile (file "col/log"))
 (def data (col/open "col"))
 (col/insert data {:map1 {:val 123 :vec [1 2 3]} :score 2})
 (col/insert data {:id 1 :name "Howard"      :age "young" :likes ["Clojure" "sailing" "OOP" "AFL"] :score 1})
@@ -14,7 +12,8 @@
 (col/index-path data [:id])
 (col/index-path data [:likes])
 (def col-pos (let [all-docs (transient [])]
-               (col/all data #(conj! all-docs (:_pos %)))))
+               (col/all data #(conj! all-docs (:_pos %)))
+               (persistent! all-docs)))
 
 (deftest test-eq
   (is (query/doc-match? (col/by-pos data (first col-pos)) [:map1 :val] 123))

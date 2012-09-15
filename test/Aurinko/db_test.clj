@@ -5,8 +5,8 @@
 
 (defn all-docs [col]
   (let [docs (transient [])]
-    (all-docs col #(conj! docs (dissoc % :_pos)))
-    (persistent! all-docs)))
+    (col/all col #(conj! docs %))
+    (persistent! docs)))
 
 (deftest db
   (.mkdir (file "db"))
@@ -27,7 +27,7 @@
       ; compress collection
       (col/delete c1 (first (all-docs c1)))
       (db/compress db "c1")
-      (is (= (.length (file "db/c1/data")) (+ 8 (* 15 2))))
+      (is (= (.length (file "db/c1/data")) (+ col/COL-HDR col/COL-GROW)))
       (is (= (set (db/all db)) #{"c1" "c2"}))
       (is (= (set (col/indexed (db/col db "c1"))) #{[:a]}))
       ; repair collection

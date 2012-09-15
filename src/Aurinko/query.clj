@@ -13,8 +13,8 @@
   (when (some nil? args) (throw (Exception. (str args": no enough arguments for op " op)))))
 
 (defn scan-eq
+  "Lookup in a collection/result set"
   ([col stack]
-    "Lookup in a collection/result set"
     (let [[limit val path source & _] stack
           index-scan (fn [] (hash/k (col/index col path) val limit
                                     #(doc-match? (col/by-pos col %) path val)))] ; avoid hash collision
@@ -23,23 +23,23 @@
               (cond
                 (= source :col)
                 (if (nil? (col/index col path))
-                  (let [docs (transient [])]
-                    (col/all col (fn [doc]
-                                   (when (doc-match? doc path val)
-                                     (conj! docs (:_pos doc)))))
-                    (let [persist (persistent! docs)]
-                      (if (= limit -1)
-                        persist
-                        (take limit persist))))
+                  (let [result  (persistent!
+                                  (let [filtered (transient [])]
+                                    (col/all col #(when (doc-match? % path val)
+                                                    (conj! filtered (:_pos %))))
+                                    filtered))]
+                    (if (= limit -1)
+                      result
+                      (take limit result)))
                   (index-scan))
                 (set? source)
                 (if (nil? (col/index col path))
-                (let [result (filter #(doc-match? (col/by-pos col %) path val)
-                                     source)]
-                  (if (= limit -1)
-                    result
-                    (take limit result)))
-                (intersection source (index-scan)))
+                  (let [result (filter #(doc-match? (col/by-pos col %) path val)
+                                       source)]
+                    (if (= limit -1)
+                      result
+                      (take limit result)))
+                  (intersection source (index-scan)))
                 :else
                 (throw (Exception. (str "Expecting " source " to be :col or set")))))
             (drop 4 stack))))
@@ -52,14 +52,17 @@
     (check-args op val path source)
     (cons (set (cond
                  (= source :col)
-                 (let [docs (transient [])]
-                   (col/all col (fn [doc]
-                                  (when (op (compare (get-in doc path) val) 0)
-                                    (conj! docs (:_pos doc)))))
-                   (let [persist (persistent! docs)]
-                     (if (= limit -1)
-                       persist
-                       (take limit persist))))
+                 (let [result (persistent!
+                                (let [filtered (transient [])]
+                                  (col/all col
+                                           #(let [doc-val (get-in % path)]
+                                              (when (and (not (nil? doc-val))
+                                                         (op (compare doc-val val) 0))
+                                                (conj! filtered (:_pos %)))))
+                                  filtered))]
+                   (if (= limit -1)
+                     result
+                     (take limit result)))
                  (set? source)
                  (filter #(let [doc-val (get-in (col/by-pos col %) path)]
                             (and (not (nil? doc-val))
@@ -74,14 +77,16 @@
   (let [[s1 s2 & _] stack]
     (check-args op s1 s2)
     (cons (op (if (= s1 :col)
-                (let [all-docs (transient (hash-set))]
-                  (col/all col #(conj! all-docs (:_pos %)))
-                  (persistent! all-docs))
+                (set (persistent!
+                       (let [all-docs (transient [])]
+                         (col/all col #(conj! all-docs (:_pos %)))
+                         all-docs)))
                 s1)
               (if (= s2 :col)
-                (let [all-docs (transient (hash-set))]
-                  (col/all col #(conj! all-docs (:_pos %)))
-                  (persistent! all-docs))
+                (set (persistent!
+                       (let [all-docs (transient [])]
+                         (col/all col #(conj! all-docs (:_pos %)))
+                         all-docs)))
                 s2))
           (drop 2 stack))))
 
@@ -91,11 +96,11 @@
     (check-args op path source)
     (cons (set (cond
                  (= source :col)
-                 (let [docs (transient (hash-set))]
-                   (col/all col (fn [doc]
-                                  (when (op (get-in doc path))
-                                    (conj! docs (:_pos doc)))))
-                   (persistent! docs))
+                 (persistent!
+                   (let [filtered (transient [])]
+                     (col/all col #(when (op (get-in % path))
+                                     (conj! filtered (:_pos %))))
+                     filtered))
                  (set? source)
                  (filter #(op (get-in (col/by-pos col %) path)) source)
                  :else
@@ -110,9 +115,10 @@
                  (into {}
                        (cond
                          (= source :col)
-                         (let [pos-vals (transient [])]
-                           (col/all col (fn [doc]
-                                          (conj! pos-vals [(:_pos doc) (get-in doc path)]))))
+                         (seq (persistent!
+                                (let [pairs (transient [])]
+                                  (col/all col #(conj! pairs [(:_pos %) (get-in % path)]))
+                                  pairs)))
                          (set? source)
                          (for [pos source]
                            [pos (get-in (col/by-pos col pos) path)])
@@ -124,26 +130,25 @@
 
 (defn col2set [_ col stack]
   "Put all document positions into a set and push to the stack"
-  (cons (let [all-docs (transient (hash-set))]
-          (col/all col #(conj! all-docs (:_pos %)))
-          (persistent! all-docs))
-        stack))
+  (cons (set (persistent!
+               (let [all-docs (transient [])]
+                 (col/all col #(conj! all-docs (:_pos %)))
+                 all-docs))) stack))
 
 (defn q [col conds]
-  (loop [stack '()
+  (loop [stack     '()
          remaining conds]
     (let [thing (first remaining)]
-      (if (nil? thing)
-        (vec stack)
+      (if (nil? thing) (vec stack)
         (recur
           (if (and (keyword? thing) (not= thing :col))
             ((case thing
-               :eq scan-eq
-               (:ne :ge :gt :le :lt) scan-ineq
+               :eq                       scan-eq
+               (:ne :ge :gt :le :lt)     scan-ineq
                (:diff :intersect :union) two-sets
-               (:has :not-have) path-check
-               (:asc :desc) sorted
-               :all col2set
+               (:has :not-have)          path-check
+               (:asc :desc)              sorted
+               :all                      col2set
                (throw (Exception. (str thing ": not understood"))))
               (thing {:eq scan-eq :ge >= :gt > :le <= :lt < :ne not=
                       :diff difference :intersect intersection :union union

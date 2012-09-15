@@ -7,7 +7,7 @@
 (def Q (LinkedBlockingQueue.)) ; all read/write operations are queued in here
 (def db (atom nil))
 
-(defn enQ [^PrintWriter p fun show-results]
+(defn enQ [^PrintWriter p ^clojure.lang.IFn fun show-results]
   (.offer ^LinkedBlockingQueue Q
     #(binding [*out* p]
        (try
@@ -68,7 +68,7 @@
   (if (> (count args) 1)
     (do
       (reset! db (db/open (nth args 1)))
-      (doto (Thread. #(loop [] ((.take ^LinkedBlockingQueue Q)) (recur)))
+      (doto (Thread. #(loop [] (^clojure.lang.IFn (.take ^LinkedBlockingQueue Q)) (recur)))
         (.start)) ; only one worker to work on the queue
       (doto (Timer.)
         (.scheduleAtFixedRate
