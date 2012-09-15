@@ -23,12 +23,14 @@
               (cond
                 (= source :col)
                 (if (nil? (col/index col path))
-                  (let [result (for [doc (filter #(doc-match? % path val)
-                                               (col/all col))]
-                                 (:_pos doc))]
-                    (if (= limit -1)
-                      result
-                      (take limit result)))
+                  (let [docs (transient [])]
+                    (col/all col (fn [doc]
+                                   (when (doc-match? doc path val)
+                                     (conj! docs (:_pos doc)))))
+                    (let [persist (persistent! docs)]
+                      (if (= limit -1)
+                        persist
+                        (take limit persist))))
                   (index-scan))
                 (set? source)
                 (if (nil? (col/index col path))
@@ -50,14 +52,14 @@
     (check-args op val path source)
     (cons (set (cond
                  (= source :col)
-                 (let [result (for [doc (filter #(let [doc-val (get-in % path)]
-                                                   (and (not (nil? doc-val))
-                                                        (op (compare doc-val val) 0)))
-                                                (col/all col))]
-                                (:_pos doc))]
-                   (if (= limit -1)
-                     result
-                     (take limit result)))
+                 (let [docs (transient [])]
+                   (col/all col (fn [doc]
+                                  (when (op (compare (get-in doc path) val) 0)
+                                    (conj! docs (:_pos doc)))))
+                   (let [persist (persistent! docs)]
+                     (if (= limit -1)
+                       persist
+                       (take limit persist))))
                  (set? source)
                  (filter #(let [doc-val (get-in (col/by-pos col %) path)]
                             (and (not (nil? doc-val))
@@ -71,8 +73,16 @@
   "Set operations"
   (let [[s1 s2 & _] stack]
     (check-args op s1 s2)
-    (cons (op (if (= s1 :col) (set (for [doc (col/all col)] (:_pos doc))) s1)
-              (if (= s2 :col) (set (for [doc (col/all col)] (:_pos doc))) s2))
+    (cons (op (if (= s1 :col)
+                (let [all-docs (transient (hash-set))]
+                  (col/all col #(conj! all-docs (:_pos %)))
+                  (persistent! all-docs))
+                s1)
+              (if (= s2 :col)
+                (let [all-docs (transient (hash-set))]
+                  (col/all col #(conj! all-docs (:_pos %)))
+                  (persistent! all-docs))
+                s2))
           (drop 2 stack))))
 
 (defn path-check [op col stack]
@@ -81,7 +91,11 @@
     (check-args op path source)
     (cons (set (cond
                  (= source :col)
-                 (for [doc (filter #(op (get-in % path)) (col/all col))] (:_pos doc))
+                 (let [docs (transient (hash-set))]
+                   (col/all col (fn [doc]
+                                  (when (op (get-in doc path))
+                                    (conj! docs (:_pos doc)))))
+                   (persistent! docs))
                  (set? source)
                  (filter #(op (get-in (col/by-pos col %) path)) source)
                  :else
@@ -96,8 +110,9 @@
                  (into {}
                        (cond
                          (= source :col)
-                         (for [doc (col/all col)]
-                           [(:_pos doc) (get-in doc path)])
+                         (let [pos-vals (transient [])]
+                           (col/all col (fn [doc]
+                                          (conj! pos-vals [(:_pos doc) (get-in doc path)]))))
                          (set? source)
                          (for [pos source]
                            [pos (get-in (col/by-pos col pos) path)])
@@ -109,7 +124,10 @@
 
 (defn col2set [_ col stack]
   "Put all document positions into a set and push to the stack"
-  (cons (set (for [doc (col/all col)] (:_pos doc))) stack))
+  (cons (let [all-docs (transient (hash-set))]
+          (col/all col #(conj! all-docs (:_pos %)))
+          (persistent! all-docs))
+        stack))
 
 (defn q [col conds]
   (loop [stack '()

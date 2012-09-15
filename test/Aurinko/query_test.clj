@@ -13,7 +13,8 @@
 (col/insert data {:id 3 :name "Bobby"       :age "very young" :likes ["AFL" "NRL"]})
 (col/index-path data [:id])
 (col/index-path data [:likes])
-(def col-pos (for [doc (col/all data)] (:_pos doc)))
+(def col-pos (let [all-docs (transient [])]
+               (col/all data #(conj! all-docs (:_pos %)))))
 
 (deftest test-eq
   (is (query/doc-match? (col/by-pos data (first col-pos)) [:map1 :val] 123))

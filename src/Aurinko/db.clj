@@ -43,7 +43,7 @@
               (let [indexed (col/indexed c)
                     tmp-name (str (System/nanoTime))
                     tmp      (do (create this tmp-name) ((keyword tmp-name) cols))]
-                (doseq [doc (col/all ((keyword name) cols))] (col/insert tmp doc))
+                (col/all ((keyword name) cols) #(col/insert tmp %))
                 (delete this name)
                 (rename this tmp-name name)
                 (let [repaired (col this name)]

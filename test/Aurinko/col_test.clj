@@ -3,6 +3,11 @@
   (:use clojure.test
         [clojure.java.io :only [file]]))
 
+(defn all-docs [col]
+  (let [docs (transient [])]
+    (col/all col #(conj! docs (dissoc % :_pos)))
+    (persistent! docs)))
+
 (deftest file2index
   (let [name "[!a !b !c].index"
         hash (hash/new name 1 1)
@@ -28,13 +33,13 @@
       ; insert - not indexed
       (col/insert c {:foo {:bar "spam"}})
       ; read all
-      (is (= (for [doc (col/all c)] (dissoc doc :_pos))
+      (is (= (all-docs c)
              [{:a {:b [1 2]} :c 3}
               {:a {:b [4 5]} :c 6}
               {:foo {:bar "spam"}}]))
       ; index working?
-      (let [first-doc (:_pos (first (col/all c)))
-            second-doc (:_pos (second (col/all c)))]
+      (let [first-doc (:_pos (first (all-docs c)))
+            second-doc (:_pos (second (all-docs c)))]
         (is (= (set (hash/k h1 1 -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k h1 2 -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k h2 3 -1 (fn [_] true))) #{first-doc}))
@@ -42,17 +47,17 @@
         (is (= (set (hash/k h1 5 -1 (fn [_] true))) #{second-doc}))
         (is (= (set (hash/k h2 6 -1 (fn [_] true))) #{second-doc})))
       ; update - no grow
-      (col/update c (assoc (first (col/all c)) :a {:b [8 9]}))
-      (col/update c (dissoc (second (col/all c)) :a))
+      (col/update c (assoc (first (all-docs c)) :a {:b [8 9]}))
+      (col/update c (dissoc (second (all-docs c)) :a))
       ; update and grow
-      (col/update c (assoc (nth (col/all c) 2) :extra "abcdefghijklmnopqrstuvwxyz0123456789"))
-      (is (= (for [doc (col/all c)] (dissoc doc :_pos))
+      (col/update c (assoc (nth (all-docs c) 2) :extra "abcdefghijklmnopqrstuvwxyz0123456789"))
+      (is (= (all-docs c)
              [{:a {:b [8 9]} :c 3}
               {:c 6}
               {:foo {:bar "spam"} :extra "abcdefghijklmnopqrstuvwxyz0123456789"}]))
       ; index updated?
-      (let [first-doc (:_pos (first (col/all c)))
-            second-doc (:_pos (second (col/all c)))]
+      (let [first-doc  (:_pos (first (all-docs c)))
+            second-doc (:_pos (second (all-docs c)))]
         (is (= (set (hash/k h1 1 -1 (fn [_] true))) #{})) ; became 8
         (is (= (set (hash/k h1 2 -1 (fn [_] true))) #{})) ; became 9
         (is (= (set (hash/k h2 3 -1 (fn [_] true))) #{first-doc}))
@@ -67,8 +72,8 @@
       ; make a new index
       (col/index-path c [:a])
       (col/insert c {:a 1})
-      (let [first-doc (:_pos (first (col/all c)))
-            last-doc (:_pos (last (col/all c)))
+      (let [first-doc (:_pos (first (all-docs c)))
+            last-doc  (:_pos (last (all-docs c)))
             new-index (col/index c [:a])]
         (is (= (set (hash/k new-index {:b [8 9]} -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k new-index 1          -1 (fn [_] true))) #{last-doc})))

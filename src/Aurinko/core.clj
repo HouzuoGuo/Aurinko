@@ -31,7 +31,11 @@
    :unindex (fn [p [name & path]]  (enQ p (fn [] (col/unindex-path (db/col @db name) (vec path))) false))
    :indexed (fn [p [name & _]]     (enQ p (fn [] (col/indexed      (db/col @db name))) true))
    :insert  (fn [p [name doc & _]] (enQ p (fn [] (col/insert       (db/col @db name) doc)) false))
-   :findall (fn [p [name & _]]     (enQ p (fn [] (col/all          (db/col @db name))) true))
+   :findall (fn [p [name & _]]     (enQ p (fn []
+                                            (let [all-docs (transient [])]
+                                              (col/all (db/col @db name) #(conj! all-docs %))
+                                              (persistent! all-docs)))
+                                        true))
    :q       (fn [p [name & conds]] (enQ p (fn [] (query/q          (db/col @db name) conds)) true))
    :select  (fn [p [name & conds]]
               (enQ p (fn [] (let [col (db/col @db name)]

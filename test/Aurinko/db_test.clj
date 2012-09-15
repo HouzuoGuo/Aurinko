@@ -3,6 +3,11 @@
   (:use clojure.test
         [clojure.java.io :only [file]]))
 
+(defn all-docs [col]
+  (let [docs (transient [])]
+    (all-docs col #(conj! docs (dissoc % :_pos)))
+    (persistent! all-docs)))
+
 (deftest db
   (.mkdir (file "db"))
   (let [db (db/open "db")]
@@ -17,10 +22,10 @@
       (col/insert c1 {:a 1})
       (col/insert c1 {:b 2})
       (col/insert c2 {:c 3})
-      (is (= (dissoc (first (col/all c1)) :_pos) {:a 1}))
-      (is (= (dissoc (first (col/all c2)) :_pos) {:c 3}))
+      (is (= (dissoc (first (all-docs c1)) :_pos) {:a 1}))
+      (is (= (dissoc (first (all-docs c2)) :_pos) {:c 3}))
       ; compress collection
-      (col/delete c1 (first (col/all c1)))
+      (col/delete c1 (first (all-docs c1)))
       (db/compress db "c1")
       (is (= (.length (file "db/c1/data")) (+ 8 (* 15 2))))
       (is (= (set (db/all db)) #{"c1" "c2"}))
@@ -37,7 +42,7 @@
       (db/save db)
       (db/repair db "c2")
       (let [new-c2 (db/col db "c2")]
-        (is (= (set (for [c (col/all new-c2)] (dissoc c :_pos))) #{{:c 3}}))
+        (is (= (set (for [c (all-docs new-c2)] (dissoc c :_pos))) #{{:c 3}}))
         (is (= (set (col/indexed new-c2)) #{[:a]})))
       ; open existing database
       (let [open-db (db/open "db")]
