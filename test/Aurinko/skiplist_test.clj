@@ -17,9 +17,9 @@
     ; Delete values
     (doseq [i (range TEST-SIZE)]
       (when (= (nth deleted i) 1)
-        (sl/x list i (fn [_] true))))
+        (sl/x list i)))
     (doseq [i (range TEST-SIZE)]
-      (let [result (sl/lookup list i (fn [_] true))]
+      (let [result (sl/lookup list i)]
         (is (= (count result) (nth repetitions i))) ; Number of values found is right
         (is (every? #(= (:v %) i) result)) ; Values are right
         (when (= (nth deleted i) 1)        ; Deleted are invalid

@@ -13,9 +13,9 @@
   (at      [this node-num] "Put file handle at the specified node's position")
   (node-at [this node-num] "Return the node's number, level pointers and value")
   (cut-lvl [this v lvl begin-from] "Cut a level from the specified node number, look for value matches")
-  (insert [this v]      "Put a value into list")
-  (lookup [this v filt] "Lookup all nodes that contain the value")
-  (x      [this v filt] "Remove a value")
+  (insert [this v] "Put a value into list")
+  (lookup [this v] "Lookup all nodes that contain the value")
+  (x      [this v] "Remove a value")
   (scan<  [this v] "Scan for values less than v")
   (scan<= [this v] "Scan for values less or equal to v")
   (scan>  [this v] "Scan for values greater than v")
@@ -86,7 +86,7 @@
                     (.putInt   ^MappedByteBuffer file v)
                     (doseq [v (range levels)]
                       (.putInt ^MappedByteBuffer file NIL))
-                    (let [match (lookup this v (fn [_] true))]
+                    (let [match (lookup this v)]
                       ; If new node value already exists, the new node must reach as tall as the match reaches
                       (loop [lvl      (if (empty? match) top-lvl (int (max 0 (dec (count (filter #(not= % -1) (:lvls (last match))))))))
                              node-num (if (empty? match) (int 0) (int (:n (last match))))]
@@ -102,7 +102,7 @@
                                 (.position ^MappedByteBuffer file (+ new-node-pos NODE (* PTR-SIZE lvl))) ; at new node's level pointer
                                 (.putInt   ^MappedByteBuffer file old-node-num)) ; point it to the old node's pointer value
                               (recur (dec lvl) last-lvl-node))))))))))))
-  (lookup [this v filt]
+  (lookup [this v]
           (loop [lvl (dec levels)
                  node-num (int 0)
                  matches nil]
@@ -117,9 +117,9 @@
                        (if (> (count lvl-matches) (count matches))
                          lvl-matches
                          matches)))
-              (filter filt matches))))
-  (x [this v filt]
-     (doseq [match (filter #(and (filt %) (:valid %)) (lookup this v filt))]
+              matches)))
+  (x [this v]
+     (doseq [match (filter #(:valid %) (lookup this v))]
        (at this (:n match))
        (.putInt ^MappedByteBuffer file 0)))
   (scan< [this v]
@@ -141,7 +141,7 @@
                  (recur (conj! nodes node) (int (first (:lvls node))))
                  (persistent! nodes))))))
   (scan> [this v]
-         (let [start-from (lookup this v (fn [_] true))]
+         (let [start-from (lookup this v)]
            (if (or (nil? start-from) (empty? start-from))
              []
              (loop [nodes (transient [])
@@ -151,7 +151,7 @@
                  (let [node (node-at this next)]
                    (recur (conj! nodes node) (int (first (:lvls node))))))))))
   (scan>= [this v]
-          (let [start-from (lookup this v (fn [_] true))]
+          (let [start-from (lookup this v)]
             (if (or (nil? start-from) (empty? start-from))
               []
               (loop [nodes (transient [(first start-from)])
@@ -171,7 +171,7 @@
                          (conj! nodes node))
                        (int (first (:lvls node))))))))
   (scan>< [this v1 v2]
-          (let [start-from (lookup this v1 (fn [_] true))]
+          (let [start-from (lookup this v1)]
             (if (or (nil? start-from) (empty? start-from))
               []
               (loop [nodes (transient [(first start-from)])
