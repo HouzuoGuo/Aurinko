@@ -21,7 +21,9 @@
   (scan>  [this v] "Scan for values greater than v")
   (scan>= [this v] "Scan for values greater or equal to v")
   (scan<> [this v] "Scan for values not equal to v")
-  (scan>< [this v1 v2] "Scan for values within range"))
+  (scan>< [this v1 v2] "Scan for values within range")
+  (save   [this])
+  (close  [this]))
 
 (deftype SkipList [path levels P fc ^{:unsynchronized-mutable true} file cmp-fun] SkipListP
   (at [this node-num]
@@ -181,7 +183,9 @@
                   (let [node (node-at this next)]
                     (if (= -1 (cmp-fun (:v node) v2))
                       (recur (conj! nodes node) (int (first (:lvls node))))
-                      (persistent! nodes)))))))))
+                      (persistent! nodes))))))))
+  (save  [this] (.force ^FileChannel fc false))
+  (close [this] (save this) (.close ^FileChannel fc)))
 (defn open [path cmp-fun]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))]

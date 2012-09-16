@@ -43,4 +43,3 @@
     (is (= (vec (for [thing (sl/scan>< list 10 2)] (:v thing))) [])))
   (.delete (file "skiplist"))
   (.delete (file "skiplist2")))
-

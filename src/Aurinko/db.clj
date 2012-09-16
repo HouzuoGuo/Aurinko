@@ -40,19 +40,22 @@
   (compress [this name]
             (save this)
             (if-let [c ((keyword name) cols)]
-              (let [indexed (col/indexed c)
+              (let [hash-indexed  (col/indexed c :hash)
+                    range-indexed (col/indexed c :range)
                     tmp-name (str (System/nanoTime))
                     tmp      (do (create this tmp-name) ((keyword tmp-name) cols))]
                 (col/all ((keyword name) cols) #(col/insert tmp %))
                 (delete this name)
                 (rename this tmp-name name)
                 (let [repaired (col this name)]
-                  (doseq [i indexed] (col/index-path repaired i))))
+                  (doseq [i hash-indexed]  (col/index-path repaired i :hash))
+                  (doseq [i range-indexed] (col/index-path repaired i :range))))
               (throw (Exception. (str "collection " name " does not exist")))))
   (repair [this name]
           (save this)
           (if-let [c ((keyword name) cols)]
-            (let [indexed  (col/indexed c)
+            (let [hash-indexed  (col/indexed c :hash)
+                  range-indexed (col/indexed c :range)
                   tmp-name (str (System/nanoTime))
                   tmp      (do (create this tmp-name) (col this tmp-name))]
               (fs/lines (str dir fs/sep name fs/sep "log")
@@ -68,7 +71,8 @@
               (delete this name)
               (rename this tmp-name name)
               (let [repaired (col this name)]
-                (doseq [i indexed] (col/index-path repaired i))))
+                (doseq [i hash-indexed]  (col/index-path repaired i :hash))
+                (doseq [i range-indexed] (col/index-path repaired i :range))))
             (throw (Exception. (str "collection " name " does not exist")))))
   (col   [this name]
          (when-not (contains? cols (keyword name))
