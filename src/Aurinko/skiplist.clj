@@ -4,10 +4,11 @@
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
            (java.nio MappedByteBuffer)))
 
-(def ^:const FILE-HDR (int 8))  ; file header: number of levels, chance
-(def ^:const PTR-SIZE (int 4))  ; every pointer in the file is an integer
-(def ^:const NODE     (int 8))  ; every node has integer validity (0 - invalid, 1 - valid) and node value
-(def ^:const NIL      (int -1)) ; nil pointer
+(def ^:const FILE-HDR (int 12))  ; file header: next insert pos, number of levels, chance
+(def ^:const PTR-SIZE (int 4))   ; every pointer in the file is an integer
+(def ^:const NODE     (int 8))   ; every node has integer validity (0 - invalid, 1 - valid) and node value
+(def ^:const NIL      (int -1))  ; nil pointer
+(def ^:const GROW (int 1048576)) ; grow index by 1MB when necessary
 
 (defprotocol SkipListP
   (at      [this node-num] "Put file handle at the specified node's position")
@@ -49,15 +50,18 @@
                    (= cmp-result 1)  ; return when node value is greater
                    {:node prev-node :matches (persistent! matches)})))))
   (insert [this v]
-          (let [empty-list?  (= (.limit ^MappedByteBuffer file) FILE-HDR)
-                new-node-pos (int (.limit ^MappedByteBuffer file))
+          (let [file-limit   (int (.limit ^MappedByteBuffer file))
+                node-size    (int (+ NODE (* levels PTR-SIZE)))
+                new-node-pos (int (do (.position ^MappedByteBuffer file 0) (.getInt ^MappedByteBuffer file)))
+                empty-list?  (= new-node-pos FILE-HDR)
                 new-node-num (int (quot (- (.limit ^MappedByteBuffer file) FILE-HDR) (+ NODE (* levels PTR-SIZE))))
                 top-lvl      (int (loop [lvl (int 0)]
                                     (if (and (< lvl (dec levels)) (< (Math/random) P))
                                       (recur (inc lvl))
                                       lvl)))]
-            (set! file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE
-                         0 (+ (.limit ^MappedByteBuffer file) NODE (* PTR-SIZE levels))))
+            (when (< file-limit (+ new-node-pos node-size))
+              (set! file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE
+                           0 (+ file-limit GROW))))
             (if empty-list? ; the new node is the only node
               (do ; write node value, all levels point to NIL
                 (.position ^MappedByteBuffer file FILE-HDR)
@@ -103,7 +107,9 @@
                                 (.putInt   ^MappedByteBuffer file new-node-num)  ; point it to the new node
                                 (.position ^MappedByteBuffer file (+ new-node-pos NODE (* PTR-SIZE lvl))) ; at new node's level pointer
                                 (.putInt   ^MappedByteBuffer file old-node-num)) ; point it to the old node's pointer value
-                              (recur (dec lvl) last-lvl-node))))))))))))
+                              (recur (dec lvl) last-lvl-node))))))))))
+            (.position ^MappedByteBuffer file 0) ; write next insert position
+            (.putInt   ^MappedByteBuffer file (+ new-node-pos node-size))))
   (lookup [this v]
           (loop [lvl (dec levels)
                  node-num (int 0)
@@ -195,6 +201,7 @@
 (defn new [path levels chance cmp-fun]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 FILE-HDR)]
+    (.putInt file FILE-HDR)
     (.putInt file levels)
     (.putInt file chance)
     (open path cmp-fun)))
