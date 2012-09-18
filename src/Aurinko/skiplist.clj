@@ -54,7 +54,7 @@
                 node-size    (int (+ NODE (* levels PTR-SIZE)))
                 new-node-pos (int (do (.position ^MappedByteBuffer file 0) (.getInt ^MappedByteBuffer file)))
                 empty-list?  (= new-node-pos FILE-HDR)
-                new-node-num (int (quot (- (.limit ^MappedByteBuffer file) FILE-HDR) (+ NODE (* levels PTR-SIZE))))
+                new-node-num (int (quot (- new-node-pos FILE-HDR) node-size))
                 top-lvl      (int (loop [lvl (int 0)]
                                     (if (and (< lvl (dec levels)) (< (Math/random) P))
                                       (recur (inc lvl))

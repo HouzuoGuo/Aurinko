@@ -8,24 +8,16 @@
     (col/all col #(conj! docs %))
     (persistent! docs)))
 
-(deftest file2index
-  (let [name "[!a !b !c].index"
-        hash (hash/new name 1 1)
-        tmp (file name)
-        index (col/file2index tmp)]
-    (is (= (:path index) [:a :b :c]))
-    (is (not (nil? (:hash index))))
-    (.delete tmp)))
-
 (deftest index2filename
-  (is (= (col/index2filename [:a :b :c]) "[!a !b !c].index")))
+  (is (= (col/index2filename [:a :b :c] :hash)  "[!a !b !c].hash"))
+  (is (= (col/index2filename [:d :b :c] :range) "[!d !b !c].range")))
 
 (deftest col
   (.mkdir (file "col"))
   (.createNewFile (file "col/data"))
   (.createNewFile (file "col/log"))
-  (let [h1 (hash/new "col/[!a !b].index" 4 4)
-        h2 (hash/new "col/[!c].index" 4 4)]
+  (let [h1 (hash/new "col/[!a !b].hash" 4 4)
+        h2 (hash/new "col/[!c].hash" 4 4)]
     (let [c (col/open "col")]
       ; insert - indexed
       (col/insert c {:a {:b [1 2]} :c 3})

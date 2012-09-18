@@ -11,17 +11,6 @@
 (def ^:const GROW (int 33554432)) ; grow collection by 32MB when necessary
 (def ^:const EOF (int -1))
 
-(defn file2index [^File f type] "Return an index object of the file"
-  (let [path (read-string
-               (cstr/replace
-                 (first (cstr/split (.getName f) #"\.")) ; get only the name, not extension
-                 \! \:))] ; transform e.g. [!a !b] into [:a :b]
-    (if (vector? path)
-      (case type
-        :hash  {:path path :index (hash/open (.getAbsolutePath f))}
-        :range {:path path :index (sl/open (.getAbsolutePath f))})
-      (throw (Exception. (str "not a valid index path: " path))))))
-
 (defn index2filename [path type] "Make a filename for the index path"
   (if (vector? path)
     (str (cstr/replace (pr-str path) \: \!)
@@ -47,14 +36,25 @@
   (hash-index-doc  [this doc i]  "Index a single document on hash index i")
   (range-index-doc [this doc i]  "Index a single document on range index i"))
 
-(deftype Col [path data-fc log
+(deftype Col [dir data-fc log
               ^{:unsynchronized-mutable true} data
               ^{:unsynchronized-mutable true} hashes  ; hash indexes
               ^{:unsynchronized-mutable true} ranges] ; range indexes
   ColP
   (open-indexes [this]
-                (set! hashes (remove nil? (map file2index (fs/findre path #".*\.hash"))))
-                (set! ranges (remove nil? (map file2index (fs/findre path #".*\.range")))))
+                (let [read-path #(read-string
+                                   (cstr/replace
+                                     (first (cstr/split (.getName ^File %) #"\.")) ; index file name (no ext name)
+                                     \! \:))]
+                  (set! hashes (remove nil? (map (fn [file]
+                                                   (let [path (read-path file)]
+                                                     {:path path :index (hash/open (.getAbsolutePath ^File file))})) (fs/findre dir #".*\.hash"))))
+                  (set! ranges (remove nil? (map (fn [file]
+                                                   (let [path (read-path file)]
+                                                     {:path path :index (sl/open (.getAbsolutePath ^File file)
+                                                                                 #(compare (get-in (by-pos this %1) path)
+                                                                                           (get-in (by-pos this %2) path)))}))
+                                                 (fs/findre dir #".*\.range"))))))
   (insert [this doc]
           (if (map? doc)
             (do
@@ -121,7 +121,7 @@
                (doseq [i ranges]
                  (sl/x (:index i) (:_pos doc))))
   (index-path [this path type]
-                   (let [filename (str path (index2filename path type))]
+                   (let [filename (str dir (index2filename path type))]
                      (if (or (nil? filename) (.exists (file filename)))
                        (throw (Exception. (str path " is an invalid path or already indexed")))
                        (do
@@ -131,12 +131,15 @@
                              (set! hashes (conj hashes new-index))
                              (all this #(hash-index-doc this % new-index)))
                            :range
-                           (let [new-index {:path path :index (sl/new filename 8 2 #())}] ; TODO
+                           (let [new-index {:path path :index (sl/new filename 8 2
+                                                                      (fn [v1 v2]
+                                                                        (compare (get-in (by-pos this v1) path)
+                                                                                 (get-in (by-pos this v2) path))))}]
                              (set! ranges (conj ranges new-index))
                              (all this #(range-index-doc this % new-index))))))))
   (unindex-path [this path]
-                (let [hash-index (str path (index2filename path :hash))
-                      range-index (str path (index2filename path :range))]
+                (let [hash-index (str dir (index2filename path :hash))
+                      range-index (str dir (index2filename path :range))]
                   (when (and (.exists (file hash-index)) (.delete (file hash-index)))
                     (set! hashes (remove #(= path (:path %)) hashes)))
                   (when (and (.exists (file range-index)) (.delete (file range-index)))
@@ -157,7 +160,7 @@
                  EOF
                  (do
                    (when (> room DOC-MAX)
-                     (throw (Exception. (str "collection " path " could be corrupted, repair collection?"))))
+                     (throw (Exception. (str "collection " dir " could be corrupted, repair collection?"))))
                    (let [text (byte-array room)]
                      (.get ^MappedByteBuffer data ^bytes text)
                      (when (= 1 valid)
