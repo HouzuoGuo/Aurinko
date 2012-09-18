@@ -9,8 +9,8 @@
 (col/insert data {:id 1 :name "Howard"      :age "young" :likes ["Clojure" "sailing" "OOP" "AFL"] :score 1})
 (col/insert data {:id 2 :name "Bruce Eckel" :age "young" :likes ["OOP" "Python"]   :score 3})
 (col/insert data {:id 3 :name "Bobby"       :age "very young" :likes ["AFL" "NRL"]})
-(col/index-path data [:id])
-(col/index-path data [:likes])
+(col/index-path data [:id] :hash)
+(col/index-path data [:likes] :hash)
 (def col-pos (let [all-docs (transient [])]
                (col/all data #(conj! all-docs (:_pos %)))
                (persistent! all-docs)))

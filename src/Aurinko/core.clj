@@ -27,9 +27,10 @@
    :all      (fn [p & _] (enQ p (fn [] (db/all @db)) true))
    :stop     (fn [p & _] (enQ p (fn [] (do (db/close @db) (System/exit 0))) false))
    ; table comamnds
-   :hindex  (fn [p [name & path]]  (enQ p (fn [] (col/index-path   (db/col @db name) (vec path))) false))
+   :hindex  (fn [p [name & path]]  (enQ p (fn [] (col/index-path   (db/col @db name) (vec path) :hash)) false))
    :unindex (fn [p [name & path]]  (enQ p (fn [] (col/unindex-path (db/col @db name) (vec path))) false))
-   :indexed (fn [p [name & _]]     (enQ p (fn [] (col/indexed      (db/col @db name))) true))
+   :indexed (fn [p [name & _]]     (enQ p (fn [] {:hash  (col/indexed (db/col @db name) :hash)
+                                                  :range (col/indexed (db/col @db name) :range)}) true))
    :insert  (fn [p [name doc & _]] (enQ p (fn [] (col/insert       (db/col @db name) doc)) false))
    :findall (fn [p [name & _]]     (enQ p (fn []
                                             (let [all-docs (transient [])]

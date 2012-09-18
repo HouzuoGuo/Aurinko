@@ -72,11 +72,11 @@
       (col/unindex-path c [:a :b])
       (is (not (.exists (file "col/[!a !b].index"))))
       ; make a new index
-      (col/index-path c [:a])
+      (col/index-path c [:a] :hash)
       (col/insert c {:a 1})
       (let [first-doc (:_pos (first (all-docs c)))
             last-doc  (:_pos (last (all-docs c)))
-            new-index (col/index c [:a])]
+            new-index (col/index c [:a] :hash)]
         (is (= (set (hash/k new-index {:b [8 9]} -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k new-index 1          -1 (fn [_] true))) #{last-doc})))
       (fs/rmrf (file "col")))))

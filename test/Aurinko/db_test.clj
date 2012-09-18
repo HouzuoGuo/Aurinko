@@ -17,8 +17,8 @@
     ; use collections
     (let [c1 (db/col db "c1")
           c2 (db/col db "c2")]
-      (col/index-path c1 [:a])
-      (col/index-path c2 [:a])
+      (col/index-path c1 [:a] :hash)
+      (col/index-path c2 [:a] :hash)
       (col/insert c1 {:a 1})
       (col/insert c1 {:b 2})
       (col/insert c2 {:c 3})
@@ -27,9 +27,9 @@
       ; compress collection
       (col/delete c1 (first (all-docs c1)))
       (db/compress db "c1")
-      (is (= (.length (file "db/c1/data")) (+ col/COL-HDR col/COL-GROW)))
+      (is (= (.length (file "db/c1/data")) (+ col/COL-HDR col/GROW)))
       (is (= (set (db/all db)) #{"c1" "c2"}))
-      (is (= (set (col/indexed (db/col db "c1"))) #{[:a]}))
+      (is (= (set (col/indexed (db/col db "c1") :hash)) #{[:a]}))
       ; repair collection
       (spit "db/c2/data" "#@*&$!(*@)") ; completely corrupt data
       (spit "db/c2/log" "#@*&$!(*@)" :append true) ; corrupt log file too
@@ -43,7 +43,7 @@
       (db/repair db "c2")
       (let [new-c2 (db/col db "c2")]
         (is (= (set (for [c (all-docs new-c2)] (dissoc c :_pos))) #{{:c 3}}))
-        (is (= (set (col/indexed new-c2)) #{[:a]})))
+        (is (= (set (col/indexed new-c2 :hash)) #{[:a]})))
       ; open existing database
       (let [open-db (db/open "db")]
         (is (= (set (db/all open-db)) #{"c1" "c2"})))))

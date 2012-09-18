@@ -201,7 +201,7 @@
 (defn new [path levels chance cmp-fun]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 FILE-HDR)]
-    (.putInt file FILE-HDR)
+    (.putInt file FILE-HDR) ; next insert position
     (.putInt file levels)
     (.putInt file chance)
     (open path cmp-fun)))

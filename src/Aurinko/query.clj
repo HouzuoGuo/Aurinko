@@ -1,5 +1,5 @@
 (ns Aurinko.query
-  (:require (Aurinko [col :as col] [hash :as hash]))
+  (:require (Aurinko [col :as col] [hash :as hash] [skiplist :as sl]))
   (:use clojure.set))
 
 (defn doc-match? [doc path match]
@@ -16,13 +16,17 @@
   "Lookup in a collection/result set"
   ([col stack]
     (let [[limit val path source & _] stack
-          index-scan (fn [] (hash/k (col/index col path) val limit
-                                    #(doc-match? (col/by-pos col %) path val)))] ; avoid hash collision
+          index-scan (fn []
+                       (if-let [hash-index (col/index col path :hash)]
+                         (hash/k hash-index val limit
+                                 #(doc-match? (col/by-pos col %) path val)) ; avoid hash collision
+                         (sl/lookup (col/index col path :range) val)))
+          no-index (and (nil? (col/index col path :hash)) (nil? (col/index col path :range)))]
       (check-args :eq limit val path source)
       (cons (set
               (cond
                 (= source :col)
-                (if (nil? (col/index col path))
+                (if no-index
                   (let [result  (persistent!
                                   (let [filtered (transient [])]
                                     (col/all col #(when (doc-match? % path val)
@@ -33,7 +37,7 @@
                       (take limit result)))
                   (index-scan))
                 (set? source)
-                (if (nil? (col/index col path))
+                (if no-index
                   (let [result (filter #(doc-match? (col/by-pos col %) path val)
                                        source)]
                     (if (= limit -1)

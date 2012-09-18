@@ -165,10 +165,10 @@
              (catch BufferUnderflowException e EOF)
              (catch Exception e (.printStackTrace e))))
   (all [this fun]
-       (loop [pos COL-HDR]
+       (loop [pos (int COL-HDR)]
          (.position ^MappedByteBuffer data pos)
-         (let [doc (by-pos this pos)
-               next-pos (.position ^MappedByteBuffer data)]
+         (let [doc      (by-pos this pos)
+               next-pos (int (.position ^MappedByteBuffer data))]
            (when-not (= doc EOF)
              (when-not (or (nil? doc) (empty? doc))
                (fun doc))
