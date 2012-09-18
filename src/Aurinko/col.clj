@@ -8,7 +8,7 @@
 (def ^:const COL-HDR (int 4)) ; collection header - next insert pos
 (def ^:const DOC-HDR (int 8)) ; document header - valid (0 or 1), allocated room
 (def ^:const DOC-MAX  (int 1048576))  ; maximum document size - 1MB
-(def ^:const COL-GROW (int 33554432)) ; grow collection by 32MB when necessary
+(def ^:const GROW (int 33554432)) ; grow collection by 32MB when necessary
 (def ^:const EOF (int -1))
 
 (defn file2index [^File f type] "Return an index object of the file"
@@ -68,7 +68,7 @@
                   (throw (Exception. (str "document is too large (> " DOC-MAX " bytes"))))
                 (when (< limit (+ room pos))
                   (set! data (.map ^FileChannel data-fc FileChannel$MapMode/READ_WRITE
-                               0 (+ (.limit ^MappedByteBuffer data) COL-GROW))))
+                               0 (+ (.limit ^MappedByteBuffer data) GROW))))
                 (.position ^MappedByteBuffer data pos)
                 (.putInt   ^MappedByteBuffer data 1) ; valid
                 (.putInt   ^MappedByteBuffer data room) ; allocated room
