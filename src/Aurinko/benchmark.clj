@@ -22,10 +22,10 @@
       (.delete (file "hash")))
     (prn)
 
-    (prn "Collection - insert 20k documents (3 indexes)")
-    (col/index-path col1 [:thing1])
-    (col/index-path col1 [:thing2])
-    (col/index-path col1 [:a1 :a2 :a3])
+    (prn "Collection - insert 20k documents (3 hash indexes)")
+    (col/index-path col1 [:thing1] :hash)
+    (col/index-path col1 [:thing2] :hash)
+    (col/index-path col1 [:a1 :a2 :a3] :hash)
     (time (doseq [v (range 20000)]
             (col/insert col1 {:a1 {:a2 {:a3 (rand-int 20000)}}
                               :thing1 (str (rand-int 20000))
@@ -33,16 +33,16 @@
                               :map {:complex {:data (rand-int 20000)}}
                               :action ["insert" "benchmark"]
                               :purpose "benchmark"})))
-    (prn "Collection - update 20k documents (3 indexes)")
+    (prn "Collection - update 20k documents (3 hash indexes)")
     (time (col/all col1 #(col/update col1 (assoc % :action "u"))))
-    (prn "Collection - update 20k documents (3 indexes, grow each document)")
+    (prn "Collection - update 20k documents (3 hash indexes, grow each document)")
     (time
       (col/all col1
         #(col/update col1 (assoc % :extra "123456789012345678901234567890123456789012345678901234567890"))))
     (prn "Collection - read all 20k documents")
     (time (col/all col1 (fn [_] true)))
-    (prn "Collection - index 20k documents")
-    (time (col/index-path col1 [:map :complex :data]))
+    (prn "Collection - hash index 20k documents")
+    (time (col/index-path col1 [:map :complex :data] :hash))
     (prn "Query - index lookup 20k items")
     (time (doseq [v (range 20000)]
             (let [val (rand-int 20000)]

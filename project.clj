@@ -6,4 +6,4 @@
   :dependencies [[org.clojure/clojure "1.4.0"]]
   :main Aurinko.core
   :warn-on-reflection true
-  :jvm-opts ["-Xms128m" "-Xmx1024m" "-XX:PermSize=96m" "-XX:MaxPermSize=128m"])
+)
