@@ -8,7 +8,7 @@
 (def ^:const PTR-SIZE (int 4))   ; every pointer in the file is an integer
 (def ^:const NODE     (int 8))   ; every node has integer validity (0 - invalid, 1 - valid) and node value
 (def ^:const NIL      (int -1))  ; nil pointer
-(def ^:const GROW (int 1048576)) ; grow index by 1MB when necessary
+(def ^:const GROW (int 4194304)) ; grow index by 4MB when necessary
 
 (defprotocol SkipListP
   (at      [this node-num] "Put file handle at the specified node's position")
@@ -72,7 +72,7 @@
                   (.putInt ^MappedByteBuffer file NIL)))
               (let [first-node (node-at this 0)]
                 (if (= (cmp-fun (:v first-node) v) 1) ; replace first node by the new node
-                  (let [equal-top (int (- levels (count (filter #(= % -1) (:lvls first-node)))))]
+                  (let [equal-top (int (- levels (count (filter #(= % NIL) (:lvls first-node)))))]
                     (.position ^MappedByteBuffer file FILE-HDR)
                     (.putInt   ^MappedByteBuffer file 1)
                     (.putInt   ^MappedByteBuffer file v)

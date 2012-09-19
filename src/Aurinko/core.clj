@@ -26,7 +26,7 @@
    :repair   (fn [p [name & _]]    (enQ p (fn [] (db/repair   @db name)) false))
    :all      (fn [p & _] (enQ p (fn [] (db/all @db)) true))
    :stop     (fn [p & _] (enQ p (fn [] (do (db/close @db) (System/exit 0))) false))
-   ; table comamnds
+   ; collection comamnds
    :hindex  (fn [p [name & path]]  (enQ p (fn [] (col/index-path   (db/col @db name) (vec path) :hash)) false))
    :unindex (fn [p [name & path]]  (enQ p (fn [] (col/unindex-path (db/col @db name) (vec path))) false))
    :indexed (fn [p [name & _]]     (enQ p (fn [] {:hash  (col/indexed (db/col @db name) :hash)

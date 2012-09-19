@@ -26,7 +26,7 @@
           (is (every? #(= (:valid %) false) result))))))
   ; Scan skip list
   (let [list (sl/new "skiplist2" 2 2 compare)]
-    (doseq [i (range 10)]
+    (doseq [i (shuffle (range 10))]
       (sl/insert list i))
     (is (= (vec (for [thing (sl/scan<  list 5)]    (:v thing))) [0 1 2 3 4]))
     (is (= (vec (for [thing (sl/scan<  list -1)]   (:v thing))) []))
