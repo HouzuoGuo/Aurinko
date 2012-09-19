@@ -13,7 +13,7 @@
        (try
          (let [result (fun)]
            (prn (if show-results
-                  {:result (vec result) :ok true}
+                  {:result (if (map? result) result (vec result)) :ok true}
                   {:ok true})))
          (catch Exception e (prn {:err (.getMessage e)}) (.printStackTrace e))))))
 
@@ -27,17 +27,18 @@
    :all      (fn [p & _] (enQ p (fn [] (db/all @db)) true))
    :stop     (fn [p & _] (enQ p (fn [] (do (db/close @db) (System/exit 0))) false))
    ; collection comamnds
-   :hindex  (fn [p [name & path]]  (enQ p (fn [] (col/index-path   (db/col @db name) (vec path) :hash)) false))
+   :hindex  (fn [p [name & path]]  (enQ p (fn [] (col/index-path (db/col @db name) (vec path) :hash)) false))
+   :rindex  (fn [p [name & path]]  (enQ p (fn [] (col/index-path (db/col @db name) (vec path) :range)) false))
    :unindex (fn [p [name & path]]  (enQ p (fn [] (col/unindex-path (db/col @db name) (vec path))) false))
-   :indexed (fn [p [name & _]]     (enQ p (fn [] {:hash  (col/indexed (db/col @db name) :hash)
-                                                  :range (col/indexed (db/col @db name) :range)}) true))
-   :insert  (fn [p [name doc & _]] (enQ p (fn [] (col/insert       (db/col @db name) doc)) false))
+   :indexed (fn [p [name & _]]     (enQ p (fn [] {:hash  (vec (col/indexed (db/col @db name) :hash))
+                                                  :range (vec (col/indexed (db/col @db name) :range))}) true))
+   :insert  (fn [p [name doc & _]] (enQ p (fn [] (col/insert (db/col @db name) doc)) false))
    :findall (fn [p [name & _]]     (enQ p (fn []
                                             (let [all-docs (transient [])]
                                               (col/all (db/col @db name) #(conj! all-docs %))
                                               (persistent! all-docs)))
                                         true))
-   :q       (fn [p [name & conds]] (enQ p (fn [] (query/q          (db/col @db name) conds)) true))
+   :q       (fn [p [name & conds]] (enQ p (fn [] (query/q (db/col @db name) conds)) true))
    :select  (fn [p [name & conds]]
               (enQ p (fn [] (let [col (db/col @db name)]
                               (for [result (query/q col conds)]

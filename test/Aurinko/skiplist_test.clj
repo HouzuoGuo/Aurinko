@@ -6,7 +6,7 @@
 (def ^:const TEST-SIZE 500) ; Test sample size
 
 (deftest skiplist
-  (let [list        (sl/new "skiplist" 8 3 compare)
+  (let [list        (sl/new "skiplist" 8 2 compare)
         numbers     (range TEST-SIZE)
         repetitions (for [i (range TEST-SIZE)] (max (rand-int 10) 1))
         deleted     (for [i (range TEST-SIZE)] (rand-int 2))]
@@ -26,21 +26,21 @@
           (is (every? #(= (:valid %) false) result))))))
   ; Scan skip list
   (let [list (sl/new "skiplist2" 2 2 compare)]
-    (doseq [i (shuffle (range 10))]
+    (doseq [i (conj (shuffle (range 10)) 1)]
       (sl/insert list i))
-    (is (= (vec (for [thing (sl/scan<  list 5)]    (:v thing))) [0 1 2 3 4]))
+    (is (= (vec (for [thing (sl/scan<  list 5)]    (:v thing))) [0 1 1 2 3 4]))
     (is (= (vec (for [thing (sl/scan<  list -1)]   (:v thing))) []))
-    (is (= (vec (for [thing (sl/scan<= list 5)]    (:v thing))) [0 1 2 3 4 5]))
+    (is (= (vec (for [thing (sl/scan<= list 5)]    (:v thing))) [0 1 1 2 3 4 5]))
     (is (= (vec (for [thing (sl/scan<= list -1)]   (:v thing))) []))
     (is (= (vec (for [thing (sl/scan>  list 5)]    (:v thing))) [6 7 8 9]))
     (is (= (vec (for [thing (sl/scan>  list 100)]  (:v thing))) []))
     (is (= (vec (for [thing (sl/scan>= list 5)]    (:v thing))) [5 6 7 8 9]))
     (is (= (vec (for [thing (sl/scan>= list 100)]  (:v thing))) []))
-    (is (= (vec (for [thing (sl/scan<> list 5)]    (:v thing))) [0 1 2 3 4 6 7 8 9]))
-    (is (= (vec (for [thing (sl/scan<> list 100)]  (:v thing))) [0 1 2 3 4 5 6 7 8 9]))
+    (is (= (vec (for [thing (sl/scan<> list 5)]    (:v thing))) [0 1 1 2 3 4 6 7 8 9]))
+    (is (= (vec (for [thing (sl/scan<> list 100)]  (:v thing))) [0 1 1 2 3 4 5 6 7 8 9]))
     (is (= (vec (for [thing (sl/scan>< list 2 6)]  (:v thing))) [2 3 4 5]))
     (is (= (vec (for [thing (sl/scan>< list 6 2)]  (:v thing))) [6]))
     (is (= (vec (for [thing (sl/scan>< list 10 2)] (:v thing))) []))
-    (is (= (vec (for [thing (sl/all list)] (:v thing))) (vec (range 10)))))
+    (is (= (vec (for [thing (sl/all list)] (:v thing))) [0 1 1 2 3 4 5 6 7 8 9])))
   (.delete (file "skiplist"))
   (.delete (file "skiplist2")))

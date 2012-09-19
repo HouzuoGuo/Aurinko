@@ -1,5 +1,5 @@
 (ns Aurinko.col-test
-  (:require (Aurinko [col :as col] [hash :as hash] [fs :as fs]))
+  (:require (Aurinko [col :as col] [hash :as hash] [fs :as fs] [skiplist :as sl]))
   (:use clojure.test
         [clojure.java.io :only [file]]))
 
@@ -19,18 +19,19 @@
   (let [h1 (hash/new "col/[!a !b].hash" 4 4)
         h2 (hash/new "col/[!c].hash" 4 4)]
     (let [c (col/open "col")]
+      ;(col/index-path c [:d] :range)
       ; insert - indexed
-      (col/insert c {:a {:b [1 2]} :c 3})
-      (col/insert c {:a {:b [4 5]} :c 6})
+      (col/insert c {:a {:b [1 2]} :c 3 :d 1})
+      (col/insert c {:a {:b [4 5]} :c 6 :d 2})
       ; insert - not indexed
       (col/insert c {:foo {:bar "spam"}})
       ; read all
       (is (= (for [doc (all-docs c)]
                (dissoc doc :_pos))
-             [{:a {:b [1 2]} :c 3}
-              {:a {:b [4 5]} :c 6}
+             [{:a {:b [1 2]} :c 3 :d 1}
+              {:a {:b [4 5]} :c 6 :d 2}
               {:foo {:bar "spam"}}]))
-      ; index working?
+      ; hash working?
       (let [first-doc (:_pos (first (all-docs c)))
             second-doc (:_pos (second (all-docs c)))]
         (is (= (set (hash/k h1 1 -1 (fn [_] true))) #{first-doc}))
@@ -38,7 +39,10 @@
         (is (= (set (hash/k h2 3 -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k h1 4 -1 (fn [_] true))) #{second-doc}))
         (is (= (set (hash/k h1 5 -1 (fn [_] true))) #{second-doc}))
-        (is (= (set (hash/k h2 6 -1 (fn [_] true))) #{second-doc})))
+        (is (= (set (hash/k h2 6 -1 (fn [_] true))) #{second-doc}))
+        ;(is (= (:v (first (sl/lookup (col/index c [:d] :range) 2))) second-doc))
+        ;(is (= (:v (first (sl/lookup (col/index c [:d] :range) 1))) first-doc))
+        )
       ; update - no grow
       (col/update c (assoc (first (all-docs c)) :a {:b [8 9]}))
       (col/update c (dissoc (second (all-docs c)) :a))
@@ -46,8 +50,8 @@
       (col/update c (assoc (nth (all-docs c) 2) :extra "abcdefghijklmnopqrstuvwxyz0123456789"))
       (is (= (for [doc (all-docs c)]
                (dissoc doc :_pos))
-             [{:a {:b [8 9]} :c 3}
-              {:c 6}
+             [{:a {:b [8 9]} :c 3 :d 1}
+              {:c 6 :d 2}
               {:foo {:bar "spam"} :extra "abcdefghijklmnopqrstuvwxyz0123456789"}]))
       ; index updated?
       (let [first-doc  (:_pos (first (all-docs c)))

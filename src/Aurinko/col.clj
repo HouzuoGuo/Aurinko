@@ -122,21 +122,20 @@
                  (sl/x (:index i) (:_pos doc))))
   (index-path [this path type]
                    (let [filename (str dir (index2filename path type))]
-                     (if (or (nil? filename) (.exists (file filename)))
+                     (if (or (not (vector? path)) (.exists (file filename)))
                        (throw (Exception. (str path " is an invalid path or already indexed")))
-                       (do
-                         (case type
-                           :hash
-                           (let [new-index {:path path :index (hash/new filename 12 100)}]
-                             (set! hashes (conj hashes new-index))
-                             (all this #(hash-index-doc this % new-index)))
-                           :range
-                           (let [new-index {:path path :index (sl/new filename 8 2
-                                                                      (fn [v1 v2]
-                                                                        (compare (get-in (by-pos this v1) path)
-                                                                                 (get-in (by-pos this v2) path))))}]
-                             (set! ranges (conj ranges new-index))
-                             (all this #(range-index-doc this % new-index))))))))
+                       (case type
+                         :hash
+                         (let [new-index {:path path :index (hash/new filename 12 100)}]
+                           (set! hashes (conj hashes new-index))
+                           (all this #(hash-index-doc this % new-index)))
+                         :range
+                         (let [new-index {:path path :index (sl/new filename 8 2
+                                                                    (fn [v1 v2]
+                                                                      (compare (get-in (by-pos this v1) path)
+                                                                               (get-in (by-pos this v2) path))))}]
+                           (set! ranges (conj ranges new-index))
+                           (all this #(range-index-doc this % new-index)))))))
   (unindex-path [this path]
                 (let [hash-index (str dir (index2filename path :hash))
                       range-index (str dir (index2filename path :range))]
