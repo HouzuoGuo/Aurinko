@@ -23,6 +23,7 @@
   (scan>= [this v] "Scan for values greater or equal to v")
   (scan<> [this v] "Scan for values not equal to v")
   (scan>< [this v1 v2] "Scan for values within range")
+  (all    [this] "Return all nodes")
   (save   [this])
   (close  [this]))
 
@@ -190,6 +191,15 @@
                     (if (= -1 (cmp-fun (:v node) v2))
                       (recur (conj! nodes node) (int (first (:lvls node))))
                       (persistent! nodes))))))))
+  (all [this]
+       (loop [curr-node-num 0
+              everything    (transient [])]
+         (if (= curr-node-num NIL)
+           (persistent! everything)
+           (let [curr-node     (node-at this curr-node-num)
+                 next-node-num (int (nth (:lvls curr-node) 0))]
+             (conj! everything curr-node)
+             (recur next-node-num everything)))))
   (save  [this] (.force ^FileChannel fc false))
   (close [this] (save this) (.close ^FileChannel fc)))
 (defn open [path cmp-fun]
