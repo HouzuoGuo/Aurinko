@@ -81,29 +81,29 @@
               (.println ^PrintWriter log (str "[:i " doc "]")))
             (throw (Exception. (str "document" doc "has to be a map")))))
   (update [this doc]
-          (let [pos (:_pos doc)]
-            (when pos
-              (.position ^MappedByteBuffer data (+ 4 pos))
-              (let [room  (int (.getInt ^MappedByteBuffer data))
-                    text  (pr-str doc)
-                    size  (int (.length text))]
-                (if (> room size)
-                  (do ; overwrite the document
-                    (unindex-doc this (by-pos this pos))
-                    (.position ^MappedByteBuffer data (+ DOC-HDR pos))
-                    (.put ^MappedByteBuffer data (.getBytes text))
+          (when-let [pos (:_pos doc)]
+            (.position ^MappedByteBuffer data (+ 4 pos))
+            (let [room  (int (.getInt ^MappedByteBuffer data))
+                  text  (pr-str doc)
+                  size  (int (.length text))]
+              (when (> size DOC-MAX)
+                (throw (Exception. (str "document is too large (> " DOC-MAX " bytes"))))
+              (if (> room size)
+                (do ; overwrite the document
+                  (unindex-doc this (by-pos this pos))
+                  (.position ^MappedByteBuffer data (+ DOC-HDR pos))
+                  (.put ^MappedByteBuffer data (.getBytes text))
                     (.put ^MappedByteBuffer data (byte-array (- room size)))
                     (doseq [i hashes] (hash-index-doc  this doc i))
                     (doseq [i ranges] (range-index-doc this doc i))
                     (.println ^PrintWriter log (str "[:u " doc "]")))
-                  (do (delete this doc) (insert this doc))))))) ; re-insert if no enough room left
+                (do (delete this doc) (insert this doc)))))) ; re-insert if no enough room left
   (delete [this doc]
-          (let [pos (:_pos doc)]
-            (when pos
-              (.position ^MappedByteBuffer data pos)
-              (.putInt   ^MappedByteBuffer data 0) ; set valid to 0 - deleted
-              (unindex-doc this doc)
-              (.println ^PrintWriter log (str "[:d " pos "]")))))
+          (when-let [pos (:_pos doc)]
+            (.position ^MappedByteBuffer data pos)
+            (.putInt   ^MappedByteBuffer data 0) ; set valid to 0 - deleted
+            (unindex-doc this doc)
+            (.println ^PrintWriter log (str "[:d " pos "]"))))
   (hash-index-doc [this doc i]
                   (let [val      (get-in doc (:path i))
                         to-index (if (vector? val) val [val])]
