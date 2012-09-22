@@ -20,7 +20,7 @@
                        (if-let [hash-index (col/index col path :hash)]
                          (hash/k hash-index val limit
                                  #(doc-match? (col/by-pos col %) path val)) ; avoid hash collision
-                         (sl/lookup (col/index col path :range) val)))
+                         (sl/findv (col/index col path :range) val)))
           no-index (and (nil? (col/index col path :hash)) (nil? (col/index col path :range)))]
       (check-args :eq limit val path source)
       (cons (set

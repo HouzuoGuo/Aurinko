@@ -6,7 +6,7 @@
 (def ^:const TEST-SIZE 500) ; Test sample size
 
 (deftest skiplist
-  (let [list        (sl/new "skiplist" 8 2 compare)
+  (let [list        (sl/new "skiplist" 8 2 compare compare)
         numbers     (range TEST-SIZE)
         repetitions (for [i (range TEST-SIZE)] (max (rand-int 10) 1))
         deleted     (for [i (range TEST-SIZE)] (rand-int 2))]
@@ -19,13 +19,13 @@
       (when (= (nth deleted i) 1)
         (sl/x list i)))
     (doseq [i (range TEST-SIZE)]
-      (let [result (sl/lookup list i)]
+      (let [result (sl/findv list i)]
         (is (= (count result) (nth repetitions i))) ; Number of values found is right
         (is (every? #(= (:v %) i) result)) ; Values are right
         (when (= (nth deleted i) 1)        ; Deleted are invalid
           (is (every? #(= (:valid %) false) result))))))
   ; Scan skip list
-  (let [list (sl/new "skiplist2" 2 2 compare)]
+  (let [list (sl/new "skiplist2" 2 2 compare compare)]
     (doseq [i (conj (shuffle (range 10)) 1)]
       (sl/insert list i))
     (is (= (vec (for [thing (sl/scan<  list 5)]    (:v thing))) [0 1 1 2 3 4]))

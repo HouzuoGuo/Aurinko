@@ -19,7 +19,7 @@
   (let [h1 (hash/new "col/[!a !b].hash" 4 4)
         h2 (hash/new "col/[!c].hash" 4 4)]
     (let [c (col/open "col")]
-      ;(col/index-path c [:d] :range)
+      (col/index-path c [:d] :range)
       ; insert - indexed
       (col/insert c {:a {:b [1 2]} :c 3 :d 1})
       (col/insert c {:a {:b [4 5]} :c 6 :d 2})
@@ -40,8 +40,8 @@
         (is (= (set (hash/k h1 4 -1 (fn [_] true))) #{second-doc}))
         (is (= (set (hash/k h1 5 -1 (fn [_] true))) #{second-doc}))
         (is (= (set (hash/k h2 6 -1 (fn [_] true))) #{second-doc}))
-        ;(is (= (:v (first (sl/lookup (col/index c [:d] :range) 2))) second-doc))
-        ;(is (= (:v (first (sl/lookup (col/index c [:d] :range) 1))) first-doc))
+        (is (= (:v (first (sl/findv (col/index c [:d] :range) 2))) second-doc))
+        (is (= (:v (first (sl/findv (col/index c [:d] :range) 1))) first-doc))
         )
       ; update - no grow
       (col/update c (assoc (first (all-docs c)) :a {:b [8 9]}))

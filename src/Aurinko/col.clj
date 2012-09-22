@@ -53,7 +53,8 @@
                                                    (let [path (read-path file)]
                                                      {:path path :index (sl/open (.getAbsolutePath ^File file)
                                                                                  #(compare (get-in (by-pos this %1) path)
-                                                                                           (get-in (by-pos this %2) path)))}))
+                                                                                           (get-in (by-pos this %2) path))
+                                                                                 #(compare (get-in (by-pos this %1) path) %2))}))
                                                  (fs/findre dir #".*\.range"))))))
   (insert [this doc]
           (if (map? doc)
@@ -133,7 +134,9 @@
                          (let [new-index {:path path :index (sl/new filename 8 2
                                                                     (fn [v1 v2]
                                                                       (compare (get-in (by-pos this v1) path)
-                                                                               (get-in (by-pos this v2) path))))}]
+                                                                               (get-in (by-pos this v2) path)))
+                                                                    (fn [v1 v2]
+                                                                      (compare (get-in (by-pos this v1) path) v2)))}]
                            (set! ranges (conj ranges new-index))
                            (all this #(range-index-doc this % new-index)))))))
   (unindex-path [this path]

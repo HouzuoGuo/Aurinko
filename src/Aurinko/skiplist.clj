@@ -13,9 +13,10 @@
 (defprotocol SkipListP
   (at      [this node-num] "Put file handle at the specified node's position")
   (node-at [this node-num] "Return the node's number, level pointers and value")
-  (cut-lvl [this v lvl begin-from] "Cut a level from the specified node number, look for value matches")
+  (cut-lvl [this v lvl begin-from cmp-fun] "Cut a level from the specified node number, look for value matches")
   (insert [this v] "Put a value into list")
-  (lookup [this v] "Lookup all nodes that contain the value")
+  (lookup [this v cmp-fun] "Find all nodes which contain the value")
+  (findv  [this v] "Find all nodes which cmp-docval thinks that they contain the value")
   (x      [this v] "Remove a value")
   (scan<  [this v] "Scan for values less than v")
   (scan<= [this v] "Scan for values less or equal to v")
@@ -27,14 +28,16 @@
   (save   [this])
   (close  [this]))
 
-(deftype SkipList [path levels P fc ^{:unsynchronized-mutable true} file cmp-fun] SkipListP
+; cmp-docs - compare indexed values inside two documents ; cmp-docval - compare one document with an indexed value
+; see documentation for more details on their usage in this skiplist implementation
+(deftype SkipList [path levels P fc ^{:unsynchronized-mutable true} file cmp-docs cmp-docval] SkipListP
   (at [this node-num]
       (.position ^MappedByteBuffer file (+ FILE-HDR (* node-num (+ NODE (* PTR-SIZE levels))))))
   (node-at [this node-num]
            (at this node-num)
            {:n node-num :valid (= (.getInt ^MappedByteBuffer file) 1) :v (.getInt ^MappedByteBuffer file)
             :lvls (vec (map (fn [_] (.getInt ^MappedByteBuffer file)) (range levels)))})
-  (cut-lvl [this v lvl begin-from]
+  (cut-lvl [this v lvl begin-from cmp-fun]
            (loop [curr-node-num (int begin-from)
                   prev-node     (node-at this begin-from)
                   matches       (transient [])]
@@ -71,7 +74,7 @@
                 (doseq [i (range levels)]
                   (.putInt ^MappedByteBuffer file NIL)))
               (let [first-node (node-at this 0)]
-                (if (= (cmp-fun (:v first-node) v) 1) ; replace first node by the new node
+                (if (= (cmp-docs (:v first-node) v) 1) ; replace first node by the new node
                   (let [equal-top (int (- levels (count (filter #(= % NIL) (:lvls first-node)))))]
                     (.position ^MappedByteBuffer file FILE-HDR)
                     (.putInt   ^MappedByteBuffer file 1)
@@ -93,12 +96,12 @@
                     (.putInt   ^MappedByteBuffer file v)
                     (doseq [v (range levels)]
                       (.putInt ^MappedByteBuffer file NIL))
-                    (let [match (lookup this v)]
+                    (let [match (lookup this v cmp-docs)]
                       ; If new node value already exists, the new node must reach as tall as the match reaches
                       (loop [lvl      (if (empty? match) top-lvl (int (max 0 (dec (count (filter #(not= % -1) (:lvls (last match))))))))
                              node-num (if (empty? match) (int 0) (int (:n (last match))))]
                         (when (> lvl -1)
-                          (let [lvl-cut       (cut-lvl this v lvl node-num)
+                          (let [lvl-cut       (cut-lvl this v lvl node-num cmp-docs)
                                 last-lvl-node (int (:n (:node lvl-cut)))]
                             (do
                               (at this last-lvl-node)
@@ -111,12 +114,12 @@
                               (recur (dec lvl) last-lvl-node))))))))))
             (.position ^MappedByteBuffer file 0) ; write next insert position
             (.putInt   ^MappedByteBuffer file (+ new-node-pos node-size))))
-  (lookup [this v]
+  (lookup [this v cmp-fun]
           (loop [lvl (dec levels)
                  node-num (int 0)
                  matches nil]
             (if (> lvl -1)
-              (let [lvl-cut     (cut-lvl this v lvl node-num)
+              (let [lvl-cut     (cut-lvl this v lvl node-num cmp-fun)
                     lvl-matches (:matches lvl-cut)]
                 (recur (dec lvl)
                        (int (if (empty? lvl-matches)
@@ -127,8 +130,10 @@
                          lvl-matches
                          matches)))
               matches)))
+  (findv [this v]
+         (lookup this v cmp-docval))
   (x [this v]
-     (doseq [match (filter #(:valid %) (lookup this v))]
+     (doseq [match (filter #(:valid %) (lookup this v cmp-docval))]
        (at this (:n match))
        (.putInt ^MappedByteBuffer file 0)))
   (scan< [this v]
@@ -137,7 +142,7 @@
            (if (= next NIL)
              (persistent! nodes)
              (let [node (node-at this next)]
-               (if (= -1 (cmp-fun (:v node) v))
+               (if (= -1 (cmp-docval (:v node) v))
                  (recur (conj! nodes node) (int (first (:lvls node))))
                  (persistent! nodes))))))
   (scan<= [this v]
@@ -146,11 +151,11 @@
            (if (= next NIL)
              (persistent! nodes)
              (let [node (node-at this next)]
-               (if (<= (cmp-fun (:v node) v) 0)
+               (if (<= (cmp-docval (:v node) v) 0)
                  (recur (conj! nodes node) (int (first (:lvls node))))
                  (persistent! nodes))))))
   (scan> [this v]
-         (let [start-from (lookup this v)]
+         (let [start-from (lookup this v cmp-docval)]
            (if (or (nil? start-from) (empty? start-from))
              []
              (loop [nodes (transient [])
@@ -160,7 +165,7 @@
                  (let [node (node-at this next)]
                    (recur (conj! nodes node) (int (first (:lvls node))))))))))
   (scan>= [this v]
-          (let [start-from (lookup this v)]
+          (let [start-from (lookup this v cmp-docval)]
             (if (or (nil? start-from) (empty? start-from))
               []
               (loop [nodes (transient [(first start-from)])
@@ -175,12 +180,12 @@
             (if (= next NIL)
               (persistent! nodes)
               (let [node (node-at this next)]
-                (recur (if (= 0 (cmp-fun (:v node) v))
+                (recur (if (= 0 (cmp-docval (:v node) v))
                          nodes
                          (conj! nodes node))
                        (int (first (:lvls node))))))))
   (scan>< [this v1 v2]
-          (let [start-from (lookup this v1)]
+          (let [start-from (lookup this v1 cmp-docval)]
             (if (or (nil? start-from) (empty? start-from))
               []
               (loop [nodes (transient [(first start-from)])
@@ -188,7 +193,7 @@
                 (if (= next NIL)
                   (persistent! nodes)
                   (let [node (node-at this next)]
-                    (if (= -1 (cmp-fun (:v node) v2))
+                    (if (= -1 (cmp-docval (:v node) v2))
                       (recur (conj! nodes node) (int (first (:lvls node))))
                       (persistent! nodes))))))))
   (all [this]
@@ -202,16 +207,17 @@
              (recur next-node-num everything)))))
   (save  [this] (.force ^FileChannel fc false))
   (close [this] (save this) (.close ^FileChannel fc)))
-(defn open [path cmp-fun]
+
+(defn open [path cmp-docs cmp-docval]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))]
     (SkipList. path (int (.getInt file))
-              (/ (.getInt file)) fc file cmp-fun)))
+              (/ (.getInt file)) fc file cmp-docs cmp-docval)))
 
-(defn new [path levels chance cmp-fun]
+(defn new [path levels chance cmp-docs cmp-docval]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0 FILE-HDR)]
     (.putInt file FILE-HDR) ; next insert position
     (.putInt file levels)
     (.putInt file chance)
-    (open path cmp-fun)))
+    (open path cmp-docs cmp-docval)))
