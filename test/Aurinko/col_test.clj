@@ -44,13 +44,13 @@
         (is (= (:v (first (sl/findv (col/index c [:d] :range) 1))) first-doc))
         )
       ; update - no grow
-      (col/update c (assoc (first (all-docs c)) :a {:b [8 9]}))
+      (col/update c (assoc (first (all-docs c)) :a {:b [8 9]} :d 3))
       (col/update c (dissoc (second (all-docs c)) :a))
       ; update and grow
       (col/update c (assoc (nth (all-docs c) 2) :extra "abcdefghijklmnopqrstuvwxyz0123456789"))
       (is (= (for [doc (all-docs c)]
                (dissoc doc :_pos))
-             [{:a {:b [8 9]} :c 3 :d 1}
+             [{:a {:b [8 9]} :c 3 :d 3}
               {:c 6 :d 2}
               {:foo {:bar "spam"} :extra "abcdefghijklmnopqrstuvwxyz0123456789"}]))
       ; index updated?
@@ -63,7 +63,9 @@
         (is (= (set (hash/k h1 5 -1 (fn [_] true))) #{})) ; removed
         (is (= (set (hash/k h2 6 -1 (fn [_] true))) #{second-doc}))
         (is (= (set (hash/k h1 8 -1 (fn [_] true))) #{first-doc}))
-        (is (= (set (hash/k h1 9 -1 (fn [_] true))) #{first-doc})))
+        (is (= (set (hash/k h1 9 -1 (fn [_] true))) #{first-doc}))
+        (is (= (:v (first (sl/findv (col/index c [:d] :range) 1))) nil)) ; became 3
+        (is (= (:v (first (sl/findv (col/index c [:d] :range) 3))) first-doc)))
       ; remove index
       (col/unindex-path c [:a :b])
       (is (not (.exists (file "col/[!a !b].index"))))
@@ -75,4 +77,7 @@
             new-index (col/index c [:a] :hash)]
         (is (= (set (hash/k new-index {:b [8 9]} -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k new-index 1          -1 (fn [_] true))) #{last-doc})))
+      ; test skiplist unindexing document
+      (col/delete c {:_pos (:_pos (first (all-docs c)))})
+      (is (= (:v (first (sl/findv (col/index c [:d] :range) 3))) nil))
       (fs/rmrf (file "col")))))
