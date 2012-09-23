@@ -68,7 +68,7 @@
         (is (= (:v (first (sl/findv (col/index c [:d] :range) 3))) first-doc)))
       ; remove index
       (col/unindex-path c [:a :b])
-      (is (not (.exists (file "col/[!a !b].index"))))
+      (is (not (.exists (file "col/[!a !b].hash"))))
       ; make a new index
       (col/index-path c [:a] :hash)
       (col/insert c {:a 1})
@@ -80,4 +80,7 @@
       ; test skiplist unindexing document
       (col/delete c {:_pos (:_pos (first (all-docs c)))})
       (is (= (:v (first (sl/findv (col/index c [:d] :range) 3))) nil))
+      ; remove skiplist index
+      (col/unindex-path c [:d])
+      (is (not (.exists (file "col/[!d].range"))))
       (fs/rmrf (file "col")))))
