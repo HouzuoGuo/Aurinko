@@ -1,6 +1,6 @@
 (ns Aurinko.benchmark
   (:use [clojure.java.io :only [file]])
-  (:require (Aurinko [hash :as hash] [col :as col] [fs :as fs] [query :as query])))
+  (:require (Aurinko [hash :as hash] [skiplist :as sl] [col :as col] [fs :as fs] [query :as query])))
 
 (defn -main [& args]
   (.mkdir (file "col0"))
@@ -11,17 +11,27 @@
     (doseq [v (range 20000)] (col/insert col0 {:tag v}))
     (col/all col0 #(col/update col0 (assoc % :tag2 "a")))
     (col/all col0 #(col/delete col0 %))
-
     (let [h (hash/new "hash" 12 100)]
       (prn "Hash - put 200k entries")
-      (time (doseq [v (range 200000)] (hash/kv h v v)))
+      (time (doseq [v (shuffle (range 200000))] (hash/kv h v v)))
       (prn "Hash - get 200k entries")
-      (time (doseq [v (range 200000)] (hash/k h v 1 (fn [_] true))))
-      (prn "Hash - invalidate 200k entries")
-      (time (doseq [v (range 200000)] (hash/x h v 1 (fn [_] true))))
+      (time (doseq [v (shuffle (range 200000))] (hash/k h v 1 (fn [_] true))))
+      (prn "Hash - delete 200k entries")
+      (time (doseq [v (shuffle (range 200000))] (hash/x h v 1 (fn [_] true))))
       (.delete (file "hash")))
     (prn)
-
+    (let [sl (sl/new "range" 8 2 compare compare)]
+      (prn "Skiplist - put 2k entries")
+      (time (doseq [i (shuffle (range 2000))]
+              (sl/insert sl i)))
+      (prn "Skiplist - get 2k entries")
+      (time (doseq [i (shuffle (range 2000))]
+              (sl/findv sl i)))
+      (prn "Skiplist - delete 2k entries")
+      (time (doseq [i (shuffle (range 2000))]
+              (sl/x sl i)))
+      (.delete (file "range")))
+    (prn)
     (prn "Collection - insert 20k documents (3 hash indexes)")
     (col/index-path col1 [:thing1] :hash)
     (col/index-path col1 [:thing2] :hash)
