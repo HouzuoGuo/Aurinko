@@ -1,5 +1,5 @@
 (ns Aurinko.query
-  (:require (Aurinko [col :as col] [hash :as hash] [skiplist :as sl]))
+  (:require (Aurinko [col :as col] [hash :as hash]))
   (:use clojure.set))
 
 (defn doc-match? [doc path match]
@@ -17,11 +17,10 @@
   ([col stack]
     (let [[limit val path source & _] stack
           index-scan (fn []
-                       (if-let [hash-index (col/index col path :hash)]
+                       (if-let [hash-index (col/index col path)]
                          (hash/k hash-index val limit
-                                 #(doc-match? (col/by-pos col %) path val)) ; avoid hash collision
-                         (sl/findv (col/index col path :range) val)))
-          no-index (and (nil? (col/index col path :hash)) (nil? (col/index col path :range)))]
+                                 #(doc-match? (col/by-pos col %) path val))))
+          no-index (nil? (col/index col path))]
       (check-args :eq limit val path source)
       (cons (set
               (cond

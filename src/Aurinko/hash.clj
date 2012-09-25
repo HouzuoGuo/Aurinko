@@ -80,8 +80,8 @@
                         ; go to next bucket if processed last entry of current bucket
                         (let [next-buk (int (nextb this buk))]
                           (if (> next-buk buk)
-                          (recur (inc count) (conj result val) 0 next-buk)
-                          (throw (Exception. (str "index " path " is corrupted, please repair collection")))))
+                            (recur (inc count) (conj result val) 0 next-buk)
+                            (throw (Exception. (str "index " path " is corrupted, please repair collection")))))
                         (recur (inc count) (conj result val) (inc i) buk)))
                     (if (= i buk-size)
                       (let [next-buk (int (nextb this buk))]

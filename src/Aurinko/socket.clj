@@ -6,14 +6,12 @@
 (defn- on-thread [f]
   (doto (Thread. #^Runnable f)
     (.start)))
-
 (defn- close-socket [#^Socket s]
   (when-not (.isClosed s)
     (doto s
       (.shutdownInput)
       (.shutdownOutput)
       (.close))))
-
 (defn- accept-fn [#^Socket s connections fun]
   (let [ins (.getInputStream s)
         outs (.getOutputStream s)]
@@ -24,9 +22,7 @@
                     (catch SocketException e))
                   (close-socket s)
                   (dosync (commute connections disj s))))))
-
 (defstruct server-def :server-socket :connections)
-
 (defn server [port fun]
   (let [ss (ServerSocket. port)
         connections (ref #{})]
@@ -36,7 +32,6 @@
                     (catch SocketException e))
                   (recur)))
     (struct-map server-def :server-socket ss :connections connections)))
-
 (defn close-server [server]
   (doseq [s @(:connections server)]
     (close-socket s))

@@ -1,6 +1,6 @@
 (ns Aurinko.benchmark
   (:use [clojure.java.io :only [file]])
-  (:require (Aurinko [hash :as hash] [skiplist :as sl] [col :as col] [fs :as fs] [query :as query])))
+  (:require (Aurinko [hash :as hash] [col :as col] [fs :as fs] [query :as query])))
 
 (defn -main [& args]
   (.mkdir (file "col0"))
@@ -8,6 +8,7 @@
   (let [col0 (col/open "col0")
         col1 (col/open "col1")]
     (prn "Warming up..")
+    (col/index-path "col0" [:tag])
     (doseq [v (range 20000)] (col/insert col0 {:tag v}))
     (col/all col0 #(col/update col0 (assoc % :tag2 "a")))
     (col/all col0 #(col/delete col0 %))
@@ -20,22 +21,10 @@
       (time (doseq [v (shuffle (range 200000))] (hash/x h v 1 (fn [_] true))))
       (.delete (file "hash")))
     (prn)
-    (let [sl (sl/new "range" 8 2 compare compare)]
-      (prn "Skiplist - put 2k entries")
-      (time (doseq [i (shuffle (range 2000))]
-              (sl/insert sl i)))
-      (prn "Skiplist - get 2k entries")
-      (time (doseq [i (shuffle (range 2000))]
-              (sl/findv sl i)))
-      (prn "Skiplist - delete 2k entries")
-      (time (doseq [i (shuffle (range 2000))]
-              (sl/x sl i)))
-      (.delete (file "range")))
-    (prn)
     (prn "Collection - insert 20k documents (3 hash indexes)")
-    (col/index-path col1 [:thing1] :hash)
-    (col/index-path col1 [:thing2] :hash)
-    (col/index-path col1 [:a1 :a2 :a3] :hash)
+    (col/index-path col1 [:thing1])
+    (col/index-path col1 [:thing2])
+    (col/index-path col1 [:a1 :a2 :a3])
     (time (doseq [v (range 20000)]
             (col/insert col1 {:a1 {:a2 {:a3 (rand-int 20000)}}
                               :thing1 (str (rand-int 20000))
@@ -48,11 +37,11 @@
     (prn "Collection - update 20k documents (3 hash indexes, grow each document)")
     (time
       (col/all col1
-        #(col/update col1 (assoc % :extra "123456789012345678901234567890123456789012345678901234567890"))))
+               #(col/update col1 (assoc % :extra "123456789012345678901234567890123456789012345678901234567890"))))
     (prn "Collection - read all 20k documents")
     (time (col/all col1 (fn [_] true)))
     (prn "Collection - hash index 20k documents")
-    (time (col/index-path col1 [:map :complex :data] :hash))
+    (time (col/index-path col1 [:map :complex :data]))
     (prn "Query - index lookup 20k items")
     (time (doseq [v (range 20000)]
             (let [val (rand-int 20000)]

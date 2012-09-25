@@ -1,5 +1,5 @@
 (ns Aurinko.col-test
-  (:require (Aurinko [col :as col] [hash :as hash] [fs :as fs] [skiplist :as sl]))
+  (:require (Aurinko [col :as col] [hash :as hash] [fs :as fs]))
   (:use clojure.test
         [clojure.java.io :only [file]]))
 
@@ -9,8 +9,7 @@
     (persistent! docs)))
 
 (deftest index2filename
-  (is (= (col/index2filename [:a :b :c] :hash)  "[!a !b !c].hash"))
-  (is (= (col/index2filename [:d :b :c] :range) "[!d !b !c].range")))
+  (is (= (col/index2filename [:a :b :c])  "[!a !b !c].hash")))
 
 (deftest col
   (.mkdir (file "col"))
@@ -19,7 +18,6 @@
   (let [h1 (hash/new "col/[!a !b].hash" 4 4)
         h2 (hash/new "col/[!c].hash" 4 4)]
     (let [c (col/open "col")]
-      (col/index-path c [:d] :range)
       ; insert - indexed
       (col/insert c {:a {:b [1 2]} :c 3 :d 1})
       (col/insert c {:a {:b [4 5]} :c 6 :d 2})
@@ -39,10 +37,7 @@
         (is (= (set (hash/k h2 3 -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k h1 4 -1 (fn [_] true))) #{second-doc}))
         (is (= (set (hash/k h1 5 -1 (fn [_] true))) #{second-doc}))
-        (is (= (set (hash/k h2 6 -1 (fn [_] true))) #{second-doc}))
-        (is (= (:v (first (sl/findv (col/index c [:d] :range) 2))) second-doc))
-        (is (= (:v (first (sl/findv (col/index c [:d] :range) 1))) first-doc))
-        )
+        (is (= (set (hash/k h2 6 -1 (fn [_] true))) #{second-doc})))
       ; update - no grow
       (col/update c (assoc (first (all-docs c)) :a {:b [8 9]} :d 3))
       (col/update c (dissoc (second (all-docs c)) :a))
@@ -63,24 +58,16 @@
         (is (= (set (hash/k h1 5 -1 (fn [_] true))) #{})) ; removed
         (is (= (set (hash/k h2 6 -1 (fn [_] true))) #{second-doc}))
         (is (= (set (hash/k h1 8 -1 (fn [_] true))) #{first-doc}))
-        (is (= (set (hash/k h1 9 -1 (fn [_] true))) #{first-doc}))
-        (is (= (:v (first (sl/findv (col/index c [:d] :range) 1))) nil)) ; became 3
-        (is (= (:v (first (sl/findv (col/index c [:d] :range) 3))) first-doc)))
+        (is (= (set (hash/k h1 9 -1 (fn [_] true))) #{first-doc})))
       ; remove index
       (col/unindex-path c [:a :b])
       (is (not (.exists (file "col/[!a !b].hash"))))
       ; make a new index
-      (col/index-path c [:a] :hash)
+      (col/index-path c [:a])
       (col/insert c {:a 1})
       (let [first-doc (:_pos (first (all-docs c)))
             last-doc  (:_pos (last (all-docs c)))
-            new-index (col/index c [:a] :hash)]
+            new-index (col/index c [:a])]
         (is (= (set (hash/k new-index {:b [8 9]} -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k new-index 1          -1 (fn [_] true))) #{last-doc})))
-      ; test skiplist unindexing document
-      (col/delete c {:_pos (:_pos (first (all-docs c)))})
-      (is (= (:v (first (sl/findv (col/index c [:d] :range) 3))) nil))
-      ; remove skiplist index
-      (col/unindex-path c [:d])
-      (is (not (.exists (file "col/[!d].range"))))
       (fs/rmrf (file "col")))))

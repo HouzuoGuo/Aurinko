@@ -9,8 +9,8 @@
 (col/insert data {:id 1 :name "Howard"      :age "young" :likes ["Clojure" "sailing" "OOP" "AFL"] :score 1})
 (col/insert data {:id 2 :name "Bruce Eckel" :age "young" :likes ["OOP" "Python"]   :score 3})
 (col/insert data {:id 3 :name "Bobby"       :age "very young" :likes ["AFL" "NRL"]})
-(col/index-path data [:id] :hash)
-(col/index-path data [:likes] :hash)
+(col/index-path data [:id])
+(col/index-path data [:likes])
 (def col-pos (let [all-docs (transient [])]
                (col/all data #(conj! all-docs (:_pos %)))
                (persistent! all-docs)))
@@ -65,5 +65,5 @@
   ; sort ascending
   (is (= (query/q data [:col [:score] :asc]) [[(nth col-pos 3) (nth col-pos 1) (nth col-pos 0) (nth col-pos 2)]]))
   ; all
-  (is (= (query/q data [:all]) [(set col-pos)])))
-(fs/rmrf (file "col"))
+  (is (= (query/q data [:all]) [(set col-pos)]))
+  (fs/rmrf (file "col")))

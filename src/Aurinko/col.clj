@@ -1,22 +1,19 @@
 (ns Aurinko.col
   (:use [clojure.java.io :only [file]])
-  (:require (Aurinko [hash :as hash] [fs :as fs] [skiplist :as sl]) [clojure.string :as cstr])
-  (:import (java.io File RandomAccessFile PrintWriter BufferedWriter FileWriter))
+  (:require (Aurinko [hash :as hash] [fs :as fs]) [clojure.string :as cstr])
+  (:import (java.io File RandomAccessFile PrintWriter FileWriter))
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
            (java.nio MappedByteBuffer BufferUnderflowException)))
 
 (def ^:const COL-HDR (int 4)) ; collection header - next insert pos
 (def ^:const DOC-HDR (int 8)) ; document header - valid (0 or 1), allocated room
-(def ^:const DOC-MAX  (int 1048576))  ; maximum document size - 1MB
+(def ^:const DOC-MAX (int 1048576)) ; maximum document size - 1MB
 (def ^:const GROW (int 33554432)) ; grow collection by 32MB when necessary
 (def ^:const EOF (int -1))
 
-(defn index2filename [path type] "Make a filename for the index path"
+(defn index2filename [path] "Make a filename for the index path"
   (if (vector? path)
-    (str (cstr/replace (pr-str path) \: \!)
-         (case type
-           :hash  ".hash"
-           :range ".range"))
+    (str (cstr/replace (pr-str path) \: \!) ".hash")
     (throw (Exception. (str "index path " path " has to be a vector")))))
 
 (defprotocol ColP
@@ -26,36 +23,26 @@
   (delete       [this doc])
   (unindex-doc  [this doc]  "Remove a document from indexes")
   (unindex-path [this path] "Remove an indexed path")
-  (indexed      [this type] "Return all indexed paths of the type")
+  (indexed      [this]      "Return all hash indexed paths")
   (by-pos       [this pos]  "Fetch the document at position pos")
   (all          [this fun]  "Apply the fun to all documents")
   (save         [this]      "Flush data and log to disk")
   (close        [this])
-  (index        [this path type] "Return the index object for the path")
-  (index-path   [this path type] "Index a document path (e.g. [:unix :bsd :freeBSD :ports])")
-  (hash-index-doc  [this doc i]  "Index a single document on hash index i")
-  (range-index-doc [this doc i]  "Index a single document on range index i"))
+  (index        [this path] "Return the index object for the path")
+  (index-path   [this path] "Index a document path (e.g. [:unix :bsd :freeBSD :ports])")
+  (hash-index-doc  [this doc i]  "Index a single document on hash index i"))
 
 (deftype Col [dir data-fc log
               ^{:unsynchronized-mutable true} data
-              ^{:unsynchronized-mutable true} hashes  ; hash indexes
-              ^{:unsynchronized-mutable true} ranges] ; range indexes
-  ColP
+              ^{:unsynchronized-mutable true} hashes] ColP
   (open-indexes [this]
-                (let [read-path #(read-string
-                                   (cstr/replace
-                                     (first (cstr/split (.getName ^File %) #"\.")) ; index file name (no ext name)
-                                     \! \:))]
-                  (set! hashes (remove nil? (map (fn [file]
-                                                   (let [path (read-path file)]
-                                                     {:path path :index (hash/open (.getAbsolutePath ^File file))})) (fs/findre dir #".*\.hash"))))
-                  (set! ranges (remove nil? (map (fn [file]
-                                                   (let [path (read-path file)]
-                                                     {:path path :index (sl/open (.getAbsolutePath ^File file)
-                                                                                 #(compare (get-in (by-pos this %1) path)
-                                                                                           (get-in (by-pos this %2) path))
-                                                                                 #(compare (get-in (by-pos this %1) path) %2))}))
-                                                 (fs/findre dir #".*\.range"))))))
+                (set! hashes (remove nil? (map (fn [file]
+                                                 (let [path (read-string
+                                                              (cstr/replace
+                                                                (first (cstr/split (.getName ^File file) #"\.")) ; index file name (no ext name)
+                                                                \! \:))]
+                                                   {:path path :index (hash/open (.getAbsolutePath ^File file))}))
+                                               (fs/findre dir #".*\.hash")))))
   (insert [this doc]
           (if (map? doc)
             (do
@@ -77,8 +64,7 @@
                 (.put      ^MappedByteBuffer data (byte-array length)) ; padding
                 (.position ^MappedByteBuffer data 0) ; write next insert position
                 (.putInt   ^MappedByteBuffer data (+ pos DOC-HDR room))
-                (doseq [i hashes] (hash-index-doc  this pos-doc i))
-                (doseq [i ranges] (range-index-doc this pos-doc i)))
+                (doseq [i hashes] (hash-index-doc  this pos-doc i)))
               (.println ^PrintWriter log (str "[:i " doc "]")))
             (throw (Exception. (str "document" doc "has to be a map")))))
   (update [this doc]
@@ -94,10 +80,9 @@
                   (unindex-doc this (by-pos this pos))
                   (.position ^MappedByteBuffer data (+ DOC-HDR pos))
                   (.put ^MappedByteBuffer data (.getBytes text))
-                    (.put ^MappedByteBuffer data (byte-array (- room size)))
-                    (doseq [i hashes] (hash-index-doc  this doc i))
-                    (doseq [i ranges] (range-index-doc this doc i))
-                    (.println ^PrintWriter log (str "[:u " doc "]")))
+                  (.put ^MappedByteBuffer data (byte-array (- room size)))
+                  (doseq [i hashes] (hash-index-doc  this doc i))
+                  (.println ^PrintWriter log (str "[:u " doc "]")))
                 (do (delete this doc) (insert this doc)))))) ; re-insert if no enough room left
   (delete [this doc]
           (when-let [pos (:_pos doc)]
@@ -111,48 +96,26 @@
                     (when val
                       (doseq [v to-index] ; index everything inside a vector
                         (hash/kv (:index i) v (:_pos doc))))))
-  (range-index-doc [this doc i]
-                   (sl/insert (:index i) (:_pos doc)))
   (unindex-doc [this doc]
                (doseq [i hashes]
                  (let [val     (get-in doc (:path i))
                        indexed (if (vector? val) val [val])
                        doc-pos (int (:_pos doc))]
-                   (doseq [v indexed] (hash/x (:index i) v 1 #(= % doc-pos)))))
-               (doseq [i ranges]
-                 (sl/x (:index i) (:_pos doc))))
-  (index-path [this path type]
-                   (let [filename (str dir (index2filename path type))]
-                     (if (or (not (vector? path)) (.exists (file filename)))
-                       (throw (Exception. (str path " is an invalid path or already indexed")))
-                       (case type
-                         :hash
-                         (let [new-index {:path path :index (hash/new filename 12 100)}]
-                           (set! hashes (conj hashes new-index))
-                           (all this #(hash-index-doc this % new-index)))
-                         :range
-                         (let [new-index {:path path :index (sl/new filename 8 2
-                                                                    (fn [v1 v2]
-                                                                      (compare (get-in (by-pos this v1) path)
-                                                                               (get-in (by-pos this v2) path)))
-                                                                    (fn [v1 v2]
-                                                                      (compare (get-in (by-pos this v1) path) v2)))}]
-                           (set! ranges (conj ranges new-index))
-                           (all this #(range-index-doc this % new-index)))))))
+                   (doseq [v indexed] (hash/x (:index i) v 1 #(= % doc-pos))))))
+  (index-path [this path]
+              (let [filename (str dir (index2filename path))]
+                (if (or (not (vector? path)) (.exists (file filename)))
+                  (throw (Exception. (str path " is an invalid path or already indexed")))
+                  (let [new-index {:path path :index (hash/new filename 12 100)}]
+                    (set! hashes (conj hashes new-index))
+                    (all this #(hash-index-doc this % new-index))))))
   (unindex-path [this path]
-                (let [hash-index (str dir (index2filename path :hash))
-                      range-index (str dir (index2filename path :range))]
-                  (when (and (.exists (file hash-index)) (.delete (file hash-index)))
-                    (set! hashes (remove #(= path (:path %)) hashes)))
-                  (when (and (.exists (file range-index)) (.delete (file range-index)))
-                    (set! ranges (remove #(= path (:path %)) ranges)))))
-  (indexed [this type] (for [i (case type
-                                 :hash hashes
-                                 :range ranges)] (:path i)))
-  (index [this path type] (:index (first (filter #(= (:path %) path)
-                                                 (case type
-                                                   :hash hashes
-                                                   :range ranges)))))
+                (let [hash-index (str dir (index2filename path))]
+                  (when (.exists (file hash-index))
+                    (.delete (file hash-index))
+                    (set! hashes (remove #(= path (:path %)) hashes)))))
+  (indexed [this] (for [i hashes] (:path i)))
+  (index [this path] (:index (first (filter #(= (:path %) path) hashes))))
   (by-pos  [this pos]
            (try
              (.position ^MappedByteBuffer data (int pos))
@@ -180,26 +143,23 @@
              (recur next-pos)))))
   (save  [this]
          (doseq [i hashes] (hash/save (:index i)))
-         (doseq [i ranges] (sl/save   (:index i)))
          (.force ^FileChannel data-fc false)
          (.flush ^PrintWriter log))
   (close [this]
          (save this)
          (doseq [i hashes] (hash/close (:index i)))
-         (doseq [i ranges] (sl/close   (:index i)))
          (.close ^FileChannel data-fc)
          (.close ^PrintWriter log)))
 
 (defn open [path]
   (let [fc (.getChannel (RandomAccessFile. ^String (str path (File/separator) "data") "rw"))
-        the-col (Col. (str path (File/separator))
-                      fc
-                      (PrintWriter. (BufferedWriter. (FileWriter. (str path (java.io.File/separator) "log") true)))
+        the-col (Col. (str path (File/separator)) fc
+                      (PrintWriter. (FileWriter. (str path (java.io.File/separator) "log") true))
                       (do (let [map (.map fc FileChannel$MapMode/READ_WRITE 0 (max (.size fc) COL-HDR))]
                             (when (= (.getInt ^MappedByteBuffer map) 0) ; new collection data file?
                               (.position ^MappedByteBuffer map 0)
                               (.putInt ^MappedByteBuffer map COL-HDR)) ; write the correct next insert pos
                             map))
-                      nil nil)]
+                      nil)]
     (open-indexes the-col)
     the-col))

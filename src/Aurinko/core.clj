@@ -61,10 +61,9 @@
                                   (for [pos poses]
                                     (col/by-pos col pos)))))
           ; Index
-          :hindex (do (col/index-path (db/col @db (first args)) (second args) :hash) (prn OK))
-          :rindex (do (col/index-path (db/col @db (first args)) (second args) :range) (prn OK))
+          :hindex (do (col/index-path (db/col @db (first args)) (second args)) (prn OK))
           :unindex (do (col/unindex-path (db/col @db (first args)) (second args)) (prn OK))
-          :indexed (prn {:hash (vec (col/indexed (db/col @db (first args)) :hash)) :range (vec (col/indexed (db/col @db (first args)) :range))}))   
+          :indexed (prn {:hash (vec (col/indexed (db/col @db (first args))))}))   
         (catch Exception e (prn {:err (.getMessage e)}))))))
 
 (defn -main [& args]

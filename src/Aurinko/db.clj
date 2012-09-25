@@ -6,7 +6,7 @@
   (create   [this name])
   (rename   [this old new])
   (delete   [this name])
-  (compress [this name] "Remove space used by deleted documents")
+  (compress [this name] "Compact space consumed by deleted documents")
   (repair   [this name] "Recreate the collection from its log file")
   (col      [this name])
   (all      [this])
@@ -40,22 +40,19 @@
   (compress [this name]
             (save this)
             (if-let [c ((keyword name) cols)]
-              (let [hash-indexed  (col/indexed c :hash)
-                    range-indexed (col/indexed c :range)
+              (let [hash-indexed  (col/indexed c)
                     tmp-name (str (System/nanoTime))
                     tmp      (do (create this tmp-name) ((keyword tmp-name) cols))]
                 (col/all ((keyword name) cols) #(col/insert tmp %))
                 (delete this name)
                 (rename this tmp-name name)
                 (let [repaired (col this name)]
-                  (doseq [i hash-indexed]  (col/index-path repaired i :hash))
-                  (doseq [i range-indexed] (col/index-path repaired i :range))))
+                  (doseq [i hash-indexed]  (col/index-path repaired i))))
               (throw (Exception. (str "collection " name " does not exist")))))
   (repair [this name]
           (save this)
           (if-let [c ((keyword name) cols)]
-            (let [hash-indexed  (col/indexed c :hash)
-                  range-indexed (col/indexed c :range)
+            (let [hash-indexed  (col/indexed c)
                   tmp-name (str (System/nanoTime))
                   tmp      (do (create this tmp-name) (col this tmp-name))]
               (fs/lines (str dir fs/sep name fs/sep "log")
@@ -63,7 +60,7 @@
                           (try
                             (let [entry       (read-string line)
                                   [op info _] entry]
-                              (condp = op
+                              (case op
                                 :i (col/insert tmp info)
                                 :u (col/update tmp info)
                                 :d (col/delete tmp {:_pos info})))
@@ -71,8 +68,7 @@
               (delete this name)
               (rename this tmp-name name)
               (let [repaired (col this name)]
-                (doseq [i hash-indexed]  (col/index-path repaired i :hash))
-                (doseq [i range-indexed] (col/index-path repaired i :range))))
+                (doseq [i hash-indexed]  (col/index-path repaired i))))
             (throw (Exception. (str "collection " name " does not exist")))))
   (col   [this name]
          (when-not (contains? cols (keyword name))
