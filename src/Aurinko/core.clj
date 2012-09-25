@@ -4,7 +4,7 @@
   (:import (java.util.concurrent LinkedBlockingQueue))
   (:import (java.util Timer TimerTask)))
 
-(def Q (LinkedBlockingQueue. 10000)) ; request queue
+(def Q (LinkedBlockingQueue.)) ; request queue
 (def db (atom nil))
 (def ^:const OK {:ok true})
 
