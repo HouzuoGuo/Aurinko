@@ -8,7 +8,7 @@
   (let [col0 (col/open "col0")
         col1 (col/open "col1")]
     (prn "Warming up..")
-    (col/index-path "col0" [:tag])
+    (col/index-path col0 [:tag])
     (doseq [v (range 20000)] (col/insert col0 {:tag v}))
     (col/all col0 #(col/update col0 (assoc % :tag2 "a")))
     (col/all col0 #(col/delete col0 %))
