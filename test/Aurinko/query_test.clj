@@ -65,5 +65,5 @@
   ; sort ascending
   (is (= (query/q data [:col [:score] :asc]) [[(nth col-pos 3) (nth col-pos 1) (nth col-pos 0) (nth col-pos 2)]]))
   ; all
-  (is (= (query/q data [:all]) [(set col-pos)]))
-  (fs/rmrf (file "col")))
+  (is (= (query/q data [:all]) [(set col-pos)])))
+(fs/rmrf (file "col"))
