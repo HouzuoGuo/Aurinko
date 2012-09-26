@@ -12,7 +12,7 @@
     (doseq [v (range 20000)] (col/insert col0 {:tag v}))
     (col/all col0 #(col/update col0 (assoc % :tag2 "a")))
     (col/all col0 #(col/delete col0 %))
-    (let [h (hash/new "hash" 12 100)]
+    (let [h (hash/new "hash" 14 200)]
       (prn "Hash - put 200k entries")
       (time (doseq [v (shuffle (range 200000))] (hash/kv h v v)))
       (prn "Hash - get 200k entries")
