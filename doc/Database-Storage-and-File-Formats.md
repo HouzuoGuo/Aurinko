@@ -6,9 +6,7 @@ Database storage and file formats
 Database
 --------
 
-A Aurinko database is a directory in file system. A Aurinko server
-instance operates on one database which is specified in command line
-options.
+An Aurinko database is a directory in file system. An Aurinko server instance operates on one database which is specified in command line options.
 
 Collection
 ----------
@@ -21,10 +19,15 @@ Aurinko database is made of collections. Each collection is a sub-directory in t
 
 ### Collection data file
 
-The data file is purely made of documents and document padding, one after another. When a new document is inserted, the data file is grown by twice the size of the document and the document is put into the grown
-room. Position of document in its data file uniquely identifies the document.
+The data file is made of collection header and documents - document header, document content and padding, one after another. Data file has initial capacity of 32MB and will grow another 32MB when full.
 
-When updating a document, if the new document cannot fit into the room previously allocated to the initial version of the document, it will be inserted to the end of data file.
+Beginning position of document header uniquely idenfies a document in its collection.
+
+When updating a document: if the new document cannot fit into the room previously allocated to the first version of the document, it will be inserted as new document, the old document will be marked as invalid in its document header.
+
+When deleting a document, the deleted document is marked as invalid in its document header.
+
+The first 4 bytes in data file is an integer of next insert document position, it is updated whenever a new document is inserted to the data file.
 
 Each document consists of:
 <table>
@@ -55,8 +58,8 @@ Each document consists of:
   <tr>
     <td>Document padding</td>
     <td>Allocated room - size of document body</td>
-    <td>String</td>
-    <td>Made of value 0s</td>
+    <td>Bytes</td>
+    <td>Made of byte value 0</td>
   </tr>
 </table>
 ### Collection log file
@@ -85,13 +88,13 @@ Every entry comes with a trailing new line character “\\n”. There are three 
 
 ### Index file
 
-As of version 0.1, Aurinko only supports hash index. The hash index implementation is a static hash table using chained buckets to handle overgrowth. Last N (user-defined) bits of each entry hash decides which bucket the entry goes to, the entry goes to the next invalidated/empty entry slot in the bucket. If such slot cannot be found, the next bucket in chain is scanned to find such an empty slot. If such slot still is
+As of version 0.3, Aurinko only supports hash index. The hash index implementation is a static hash table using chained buckets to handle overgrowth. By default, each bucket may contain 200 entries, and last 14 bits of each key hash decides which bucket the entry goes to. Hash entry goes to the next invalidated/empty entry slot in the bucket. If such slot cannot be found, the next bucket in chain is scanned to find such an empty slot. If such slot still is
 not found, a new bucket is grown at end of the hash index file and chained to the bucket.
 
 Index files are named by the vector of indexed path (made of keywords)
 replaced “:” with “!”. For example, if indexed path is
 `[:os :release :notes]`, the index file name will be
-`[!os !release !notes]`.
+`[!os !release !notes].hash`.
 
 Hash index file is made of one index file header and many index entries. Index file header consists of:
 <table>

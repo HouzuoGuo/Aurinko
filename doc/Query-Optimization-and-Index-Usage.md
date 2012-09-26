@@ -3,8 +3,7 @@ Query optimization and usage of index
 
 *[Back to Index][]*
 
-As of version 0.1, Aurinko only supports hash index, thus only look-up queries are benefited by usage of index. Implementation of skip list index is the highest priority in the next release, and range queries
-will be much faster once it is implemented.
+As of version 0.3, Aurinko only supports hash index, thus only look-up queries are benefited by usage of index. Implementation of skip list index is in master branch, however it is not yet ready yet. Range queries will be much faster once it is implemented.
 
 The implementation details of hash index can be found [here][].
 

@@ -18,11 +18,11 @@ Collection:
   <tr>
     <td>Collection size</td>
     <td>2GB</td>
-    <td></td>
+    <td>This limit is due to that Aurinko makes heavy usage of memory mapped file.</td>
   </tr>
   <tr>
     <td>Indexed path length</td>
-    <td>250 characters</td>
+    <td>240 characters</td>
     <td>Index files are named using the indexed path, thus this is a file system limitation.</td>
   </tr>
 </table>

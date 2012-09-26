@@ -3,24 +3,23 @@ Networking and concurrency support in Aurinko
 
 *[Back to Index][]*
 
-Facts about Aurinko networking support:
+Server and request/response formats:
 
 -   One Aurinko server instance serves one database.
+-   Client makes request to server in [Extensible Data Notation][].
+-   Server produces responses in [Extensible Data Notation][].
+
+Concurrency, safety and fairness:
+
 -   One new thread is created for each incoming connection.
--   Client makes request to server using a format natively understood by Clojure programming language.
--   Server produces responses in a format which is natively understood by Clojure programming language. (See [CON][] for more detials)
-
-Facts about concurrency in Aurinko:
-
--   All requests from all connections are queued in one
-    `java.util.concurrent.LinkedBlockingQueue`
--   There is one worker in each Aurinko server instance to work on the queue.
+-   Concurrent safety and faireness in processing incoming requests is guaranteed by Clojure's [locking][] function.
+-   [locking][] is also used to guarantee faireness of request processing.
+-   Processing of requests are serialized at database level (No finer grained locking support yet).
 -   All read operations are serialized.
--   All write operations are serialized.
-
-Concurrent read support is a high priority feature in the next Aurinko release.
+-   All write operations are serialized together with read operations.
 
 *[Back to Index][]*
 
 [Back to Index]: https://github.com/HouzuoGuo/Aurinko/wiki
-[CON]: https://github.com/HouzuoGuo/Aurinko/wiki/Clojure-Object-Notation
+[Extensible Data Notation]: https://github.com/edn-format/edn
+[locking]: http://clojuredocs.org/clojure_core/clojure.core/locking
