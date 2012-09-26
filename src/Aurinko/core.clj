@@ -11,14 +11,11 @@
   (if (> (count args) 1)
     (do
       (reset! db (db/open (nth args 1)))
-      (doto ; Work on the request queue
-        (Thread. #(loop [] (work (.take ^LinkedBlockingQueue Q)) (recur)))
-        (.start))
       (doto ; Flush to disk every minute
         (Timer.)
         (.scheduleAtFixedRate
           (proxy [TimerTask] []
-            (run [] (.offer ^LinkedBlockingQueue Q [*out* :save])))
+            (run [] (locking db (db/save @db))))
           0 60000))
       (socket/server (Integer/parseInt (first args))
                      (fn [in out]
@@ -30,7 +27,6 @@
                                (let [[cmd & args] (read-string line)]
                                  (case cmd
                                    ; DB management
-                                   :save     (do (locking db (db/save @db)) (prn OK))
                                    :create   (do (locking db (db/create @db (first args))) (prn OK))
                                    :rename   (do (locking db (db/rename @db (first args) (second args))) (prn OK))
                                    :drop     (do (locking db (db/delete @db (first args))) (prn OK))
