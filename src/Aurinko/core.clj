@@ -32,7 +32,7 @@
                                    :drop     (do (locking db (db/delete @db (first args))) (prn OK))
                                    :compress (do (locking db (db/compress @db (first args))) (prn OK))
                                    :repair   (do (locking db (db/repair @db (first args))) (prn OK))
-                                   :all      (prn (vec (locking db (db/all @db))))
+                                   :all      (prn (locking db (vec (db/all @db))))
                                    :stop     (do (locking db (db/close @db)) (prn OK) (System/exit 0))
                                    ; Document management
                                    :findall (do (prn (let [all-docs (transient [])]
@@ -67,14 +67,14 @@
                                    ; Query
                                    :q (let [[name & conds] args]
                                         (prn (vec (locking db (query/q (db/col @db (first args)) conds)))))
-                                   :select (prn (vec (locking db
-                                                       (let [[name & conds] args
+                                   :select (prn (locking db
+                                                  (vec (let [[name & conds] args
                                                              col (db/col @db name)]
                                                          (for [result (query/q col conds)]
                                                            (vec (for [pos result]
                                                                   (col/by-pos col pos))))))))
-                                   :fastselect (prn (vec (locking db
-                                                           (let [[name & poses] args
+                                   :fastselect (prn (locking db
+                                                      (vec (let [[name & poses] args
                                                                  col (db/col @db name)]
                                                              (for [pos poses]
                                                                (col/by-pos col pos))))))
