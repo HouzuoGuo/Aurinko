@@ -66,7 +66,7 @@
                 (.putInt   ^MappedByteBuffer data (+ pos DOC-HDR room))
                 (doseq [i hashes] (hash-index-doc  this pos-doc i)))
               (.println ^PrintWriter log (str "[:i " doc "]")))
-            (throw (Exception. (str "document" doc "has to be a map")))))
+            (throw (Exception. (str "document '" doc "' has to be a map")))))
   (update [this doc]
           (when-let [pos (:_pos doc)]
             (.position ^MappedByteBuffer data (+ 4 pos))
