@@ -106,7 +106,7 @@
               (let [filename (str dir (index2filename path))]
                 (if (or (not (vector? path)) (.exists (file filename)))
                   (throw (Exception. (str path " is an invalid path or already indexed")))
-                  (let [new-index {:path path :index (hash/new filename 12 100)}]
+                  (let [new-index {:path path :index (hash/new filename 14 200)}]
                     (set! hashes (conj hashes new-index))
                     (all this #(hash-index-doc this % new-index))))))
   (unindex-path [this path]
