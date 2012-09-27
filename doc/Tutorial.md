@@ -52,7 +52,7 @@ Repair collection: *[:repair "collection_name"]*
     [:repair "os"]
     > {:ok true}
 
-Repair recovers collection from serious corrption by reproducing the whole collection and its indexes from its log file. Does not compress!
+Repair recovers collection from serious corruption by reproducing the whole collection and its indexes from its log file. Does not compress!
 
 Compress collection: *[:compress "collection_name"]*
     

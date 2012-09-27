@@ -59,8 +59,7 @@ Aurinko is actively developed, please submit feature recommendations and check o
 Contact
 -------
 
-You are very welcomed to submit your feedback/question/suggestion/feature request to the author [Howard
-Guo][].
+You are very welcomed to submit your feedback/question/suggestion/feature request to the author [Howard Guo][].
 Please also follow me on Twitter [@hzguo][] and my blog [Howard’s programming and OS stuff][].
 
 License & Copyright

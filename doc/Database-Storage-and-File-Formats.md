@@ -21,7 +21,7 @@ Aurinko database is made of collections. Each collection is a sub-directory in t
 
 The data file is made of collection header and documents - document header, document content and padding, one after another. Data file has initial capacity of 32MB and will grow another 32MB when full.
 
-Beginning position of document header uniquely idenfies a document in its collection.
+Beginning position of document header uniquely identifies a document in its collection.
 
 When updating a document: if the new document cannot fit into the room previously allocated to the first version of the document, it will be inserted as new document, the old document will be marked as invalid in its document header.
 
@@ -88,8 +88,7 @@ Every entry comes with a trailing new line character “\\n”. There are three 
 
 ### Index file
 
-As of version 0.3, Aurinko only supports hash index. The hash index implementation is a static hash table using chained buckets to handle overgrowth. By default, each bucket may contain 200 entries, and last 14 bits of each key hash decides which bucket the entry goes to. Hash entry goes to the next invalidated/empty entry slot in the bucket. If such slot cannot be found, the next bucket in chain is scanned to find such an empty slot. If such slot still is
-not found, a new bucket is grown at end of the hash index file and chained to the bucket.
+As of version 0.3, Aurinko only supports hash index. The hash index implementation is a static hash table using chained buckets to handle overgrowth. By default, each bucket may contain 200 entries, and last 14 bits of each key hash decides which bucket the entry goes to. Hash entry goes to the next invalidated/empty entry slot in the bucket. If such slot cannot be found, the next bucket in chain is scanned to find such an empty slot. If such slot still is not found, a new bucket is grown at end of the hash index file and chained to the bucket.
 
 Index files are named by the vector of indexed path (made of keywords)
 replaced “:” with “!”. For example, if indexed path is
@@ -103,6 +102,12 @@ Hash index file is made of one index file header and many index entries. Index f
     <th>Size</th>
     <th>Data type</th>
     <th>Notes</th>
+  </tr>
+  <tr>
+    <td>New bucket position</td>
+    <td>4 bytes</td>
+    <td>Integer</td>
+    <td>Hash index file is pre-allocated lots of space to avoid frequent growth. This integer tells the position of the new bucket to grow.</td>
   </tr>
   <tr>
     <td>Number of key bits</td>

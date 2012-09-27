@@ -12,8 +12,8 @@ Server and request/response formats:
 Concurrency, safety and fairness:
 
 -   One new thread is created for each incoming connection.
--   Concurrent safety and faireness in processing incoming requests is guaranteed by Clojure's [locking][] function.
--   [locking][] is also used to guarantee faireness of request processing.
+-   Concurrent safety and fairness in processing incoming requests is guaranteed by Clojure's [locking][] function.
+-   [locking][] is also used to guarantee fairness of request processing.
 -   Processing of requests are serialized at database level (No finer grained locking support yet).
 -   All read operations are serialized.
 -   All write operations are serialized together with read operations.
