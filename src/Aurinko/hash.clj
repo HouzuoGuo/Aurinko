@@ -3,9 +3,10 @@
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
            (java.nio MappedByteBuffer)))
 
-(def ^:const FILE-HDR (int 8))  ; file header: number of key bits (int); entries per bucket (int)
+(def ^:const FILE-HDR (int 12)) ; file header: new bucket position, number of key bits, entries per bucket (integers)
 (def ^:const BUK-HDR  (int 4))  ; bucket header: next chained bucket number (int)
 (def ^:const ENTRY    (int 12)) ; entry: valid (int, 0 - deleted, 1 - valid); key (int); value (int)
+(def ^:const GROW (int 33554432)) ; grow index file by 32MB when necessary
 
 (defn last-bits [integer n]
   (bit-and integer (unchecked-dec (bit-shift-left 1 n))))
@@ -33,9 +34,15 @@
            (if (= next 0) curr (recur next (int (nextb this next)))))) ; last buk has "next" set to 0
   (grow  [this i]
          (.putInt ^MappedByteBuffer (at this (lastb this i)) num-buks)
-         (set! file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE
-                      0 (+ (.limit ^MappedByteBuffer file) (+ BUK-HDR (* ENTRY buk-size)))))
-         (set! num-buks (inc num-buks)) this)
+         (set! num-buks (inc num-buks))
+         (let [new-buk-pos (do (.position ^MappedByteBuffer file 0) (.getInt ^MappedByteBuffer file))
+               buk-size (+ BUK-HDR (* ENTRY buk-size))]
+           (when (>= (+ buk-size new-buk-pos) (.limit ^MappedByteBuffer file))
+             (set! file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE
+                          0 (+ (.limit ^MappedByteBuffer file) GROW)))
+             (.position ^MappedByteBuffer file 0)
+             (.putInt ^MappedByteBuffer file (+ buk-size new-buk-pos))))
+         this)
   (save  [this] (.force ^FileChannel fc false))
   (close [this] (save this) (.close ^FileChannel fc))
   (kv [this k v]
@@ -94,17 +101,18 @@
 
 (defn open [path]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
-        file (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))
-        key-bits (int (.getInt ^MappedByteBuffer file))
-        buk-size (int (.getInt ^MappedByteBuffer file))]
-    (Hash. path key-bits buk-size fc file (quot (- (.limit ^MappedByteBuffer file) FILE-HDR)
-                                                (+ BUK-HDR (* buk-size ENTRY))))))
+        file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE 0 (.size fc))
+        new-buk-pos (int (.getInt ^MappedByteBuffer file))
+        key-bits    (int (.getInt ^MappedByteBuffer file))
+        buk-size    (int (.getInt ^MappedByteBuffer file))]
+    (Hash. path key-bits buk-size fc file (quot (- new-buk-pos FILE-HDR) (+ BUK-HDR (* buk-size ENTRY))))))
 
 (defn new [path key-bits buk-size]
   (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0
                (+ FILE-HDR (* (Math/pow 2 key-bits)
                               (+ BUK-HDR (* buk-size ENTRY)))))]
+    (.putInt ^MappedByteBuffer file (.limit ^MappedByteBuffer file)) ; new bucket position
     (.putInt ^MappedByteBuffer file key-bits)
     (.putInt ^MappedByteBuffer file buk-size)
     (open path)))

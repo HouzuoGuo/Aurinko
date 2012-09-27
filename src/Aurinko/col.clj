@@ -91,22 +91,19 @@
             (unindex-doc this doc)
             (.println ^PrintWriter log (str "[:d " pos "]"))))
   (hash-index-doc [this doc i]
-                  (let [val      (get-in doc (:path i))
-                        to-index (if (vector? val) val [val])]
-                    (when val
-                      (doseq [v to-index] ; index everything inside a vector
-                        (hash/kv (:index i) v (:_pos doc))))))
+                  (when-let [val (get-in doc (:path i))]
+                    (doseq [v (if (vector? val) val [val])] ; index everything inside a vector
+                      (hash/kv (:index i) v (:_pos doc)))))
   (unindex-doc [this doc]
                (doseq [i hashes]
                  (let [val     (get-in doc (:path i))
-                       indexed (if (vector? val) val [val])
                        doc-pos (int (:_pos doc))]
-                   (doseq [v indexed] (hash/x (:index i) v 1 #(= % doc-pos))))))
+                   (doseq [v (if (vector? val) val [val])] (hash/x (:index i) v 1 #(= % doc-pos))))))
   (index-path [this path]
               (let [filename (str dir (index2filename path))]
                 (if (or (not (vector? path)) (.exists (file filename)))
                   (throw (Exception. (str path " is an invalid path or already indexed")))
-                  (let [new-index {:path path :index (hash/new filename 14 200)}]
+                  (let [new-index {:path path :index (hash/new filename 14 100)}]
                     (set! hashes (conj hashes new-index))
                     (all this #(hash-index-doc this % new-index))))))
   (unindex-path [this path]
