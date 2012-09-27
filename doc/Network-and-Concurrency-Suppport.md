@@ -5,6 +5,7 @@ Networking and concurrency support in Aurinko
 
 Server and request/response formats:
 
+-   Aurinko is optimized for concurrent connections, but it does not yet have an official client application. To get full processing throughput, please make sure that your Aurinko client handles connection pooling properly (my suggestion is at least 50 threads).
 -   One Aurinko server instance serves one database.
 -   Client makes request to server in [Extensible Data Notation][].
 -   Server produces responses in [Extensible Data Notation][].
