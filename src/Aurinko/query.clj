@@ -131,12 +131,33 @@
     (cons (keys (if (= op <=) sorted (reverse sorted)))
           (drop 2 stack))))
 
+(defn count-result [_ col stack]
+  "Count result size"
+  (let [source (first stack)]
+    (check-args source)
+    (cons (if (= source :col) (col/number-docs col) (count source)) (drop 1 stack))))
+
 (defn col2set [_ col stack]
   "Put all document positions into a set and push to the stack"
   (cons (set (persistent!
                (let [all-docs (transient [])]
                  (col/all col #(conj! all-docs (:_pos %)))
                  all-docs))) stack))
+
+(defn str-contains [_ col stack]
+  "Return all documents which contain the string in the specified path"
+  (let [[string path source & _] stack]
+    (check-args string path source)
+    (cons (set
+            (cond
+              (= source :col)
+              (let [result (transient [])]
+                (col/all col #(when (.contains (str (get-in % path)) string)
+                                (conj! result (:_pos %))))
+                (persistent! result))
+              (set? source)
+              (filter #(.contains (str (get-in (col/by-pos col %) path)) string) source)))
+          (drop 3 stack))))
 
 (defn q [col conds]
   (loop [stack     '()
@@ -152,6 +173,8 @@
                (:has :not-have)          path-check
                (:asc :desc)              sorted
                :all                      col2set
+               :count                    count-result
+               :contains                 str-contains
                (throw (Exception. (str thing ": not understood"))))
               (thing {:eq scan-eq :ge >= :gt > :le <= :lt < :ne not=
                       :diff difference :intersect intersection :union union

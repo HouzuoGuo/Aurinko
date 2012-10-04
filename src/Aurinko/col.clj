@@ -26,6 +26,7 @@
   (indexed      [this]      "Return all hash indexed paths")
   (by-pos       [this pos]  "Fetch the document at position pos")
   (all          [this fun]  "Apply the fun to all documents")
+  (number-docs  [this]      "Count number of documents in collection")
   (save         [this]      "Flush data and log to disk")
   (close        [this])
   (index        [this path] "Return the index object for the path")
@@ -138,6 +139,23 @@
              (when-not (or (nil? doc) (empty? doc))
                (fun doc))
              (recur next-pos)))))
+  (number-docs [this]
+               (try
+                 (.position ^MappedByteBuffer data COL-HDR)
+                 (loop [number (int 0)]
+                   (let [valid (int (.getInt ^MappedByteBuffer data))
+                         room  (int (.getInt ^MappedByteBuffer data))]
+                     (if (and (= valid 0) (= room 0))
+                       number
+                       (do
+                         (when (> room DOC-MAX)
+                           (throw (Exception. (str "collection " dir " could be corrupted, repair collection?"))))
+                         (if (< (+ (.position ^MappedByteBuffer data) room) (.limit ^MappedByteBuffer data))
+                           (do
+                             (.position ^MappedByteBuffer data (+ (.position ^MappedByteBuffer data) room))
+                             (recur (if (= valid 1) (inc number) number)))
+                           number)))))
+                 (catch Exception e (.printStackTrace e))))
   (save  [this]
          (doseq [i hashes] (hash/save (:index i)))
          (.force ^FileChannel data-fc false)

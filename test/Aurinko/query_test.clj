@@ -65,5 +65,11 @@
   ; sort ascending
   (is (= (query/q data [:col [:score] :asc]) [[(nth col-pos 3) (nth col-pos 1) (nth col-pos 0) (nth col-pos 2)]]))
   ; all
-  (is (= (query/q data [:all]) [(set col-pos)])))
+  (is (= (query/q data [:all]) [(set col-pos)]))
+  ; count results
+  (is (= (query/q data [:all :count]) [(count (set col-pos))]))
+  (is (= (query/q data [:col :count]) [(count (set col-pos))]))
+  ; contains string
+  (is (= (query/q data [:col [:likes] "OOP" :contains]) [#{(nth col-pos 1) (nth col-pos 2)}]))
+  (is (= (query/q data [:all [:likes] "OOP" :contains]) [#{(nth col-pos 1) (nth col-pos 2)}])))
 (fs/rmrf (file "col"))

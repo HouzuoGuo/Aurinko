@@ -70,4 +70,6 @@
             new-index (col/index c [:a])]
         (is (= (set (hash/k new-index {:b [8 9]} -1 (fn [_] true))) #{first-doc}))
         (is (= (set (hash/k new-index 1          -1 (fn [_] true))) #{last-doc})))
+      ; get number of documents
+      (is (= (col/number-docs c) 4))
       (fs/rmrf (file "col")))))
