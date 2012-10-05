@@ -206,6 +206,13 @@ If you want to retrieve documents by their position, use `:fastselect` followed 
     [:fastselect "os" 450 296]
     > [{:_pos 450, :name "RHEL", :releases {:initial 2003, :latest 2012}} {:_pos 296, :name "opensolaris", :releases {:initial 2008, :latest 2009}}]
 
+Count query result/collection documents by using `:count` keyword; use `:contains` to search inside a string - if the path you're looking for is not a string, it will be considered as a string for the search.
+
+Count the number of OSes which sound like "solar" (NOTE the usage of `:q` rather than `:select`):
+
+    [:q "os" :col [:name] "solar" :contains :count]
+    > [2]
+
 ## Update/delete documents
 
 To delete documents, you will need to produce a query, documents in the query results will be deleted:

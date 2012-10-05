@@ -71,5 +71,7 @@
   (is (= (query/q data [:col :count]) [(count (set col-pos))]))
   ; contains string
   (is (= (query/q data [:col [:likes] "OOP" :contains]) [#{(nth col-pos 1) (nth col-pos 2)}]))
-  (is (= (query/q data [:all [:likes] "OOP" :contains]) [#{(nth col-pos 1) (nth col-pos 2)}])))
+  (is (= (query/q data [:all [:likes] "OOP" :contains]) [#{(nth col-pos 1) (nth col-pos 2)}]))
+  ; contains & count
+  (is (= (query/q data [:all [:likes] "OOP" :contains :count]) [2])))
 (fs/rmrf (file "col"))
