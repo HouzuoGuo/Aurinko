@@ -6,7 +6,7 @@ Features (and why you would choose Aurinko)
 -   Store, manage and retrieve documents in native Clojure data structures using EDN [Extensible Data Notation][]
 -   Durable data - Your data is safe in event of write-failure/unclean shutdown
 -   Networked - Safely handle concurrent database connections with fairness guarantee
--   Nice performance - Handle 20,000+ writes / 50,000+ lookups per second with confidence (given proper connection pooling)
+-   Nice performance - Handle 4,000+ writes / 8,000+ lookups per second with confidence (given proper connection pooling)
 -   Handle complex query - Use stack based syntax to easily build powerful and complex queries
 -   Compact - Implemented in just about 700 lines of Clojure code
 
