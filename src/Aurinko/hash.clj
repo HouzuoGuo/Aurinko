@@ -23,28 +23,28 @@
   (x     [this k limit filt]      "Invalidate no more than limit filtered entries of key k")
   (scan  [this k limit proc filt] "Scan entries of key k, process no more than limit filtered entries by proc"))
 
-(deftype Hash [path key-bits buk-size fc
-               ^{:unsynchronized-mutable true} file
+(deftype Hash [path key-bits buk-size ^FileChannel fc
+               ^{:unsynchronized-mutable true} ^MappedByteBuffer file
                ^{:unsynchronized-mutable true} num-buks] HashP
-  (at    [this i] (.position ^MappedByteBuffer file (+ FILE-HDR (* i (+ BUK-HDR (* ENTRY buk-size))))))
-  (nextb ^int [this i] (int (.getInt ^MappedByteBuffer (at this i))))
-  (lastb ^int [this i]
+  (at    [this i] (.position file (+ FILE-HDR (* i (+ BUK-HDR (* ENTRY buk-size))))))
+  (nextb [this i] (int (.getInt ^MappedByteBuffer (at this i))))
+  (lastb [this i]
          (loop [curr (int i)
                 next (int (nextb this i))]
            (if (= next 0) curr (recur next (int (nextb this next)))))) ; last buk has "next" set to 0
   (grow  [this i]
          (.putInt ^MappedByteBuffer (at this (lastb this i)) num-buks)
          (set! num-buks (inc num-buks))
-         (let [new-buk-pos (do (.position ^MappedByteBuffer file 0) (.getInt ^MappedByteBuffer file))
+         (let [new-buk-pos (do (.position file 0) (.getInt file))
                buk-size (+ BUK-HDR (* ENTRY buk-size))]
-           (when (>= (+ buk-size new-buk-pos) (.limit ^MappedByteBuffer file))
-             (set! file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE
-                          0 (+ (.limit ^MappedByteBuffer file) GROW)))
-             (.position ^MappedByteBuffer file 0)
-             (.putInt ^MappedByteBuffer file (+ buk-size new-buk-pos))))
+           (when (>= (+ buk-size new-buk-pos) (.limit file))
+             (set! file (.map fc FileChannel$MapMode/READ_WRITE
+                          0 (+ (.limit file) GROW)))
+             (.position file 0)
+             (.putInt file (+ buk-size new-buk-pos))))
          this)
-  (save  [this] (.force ^FileChannel fc false))
-  (close [this] (save this) (.close ^FileChannel fc))
+  (save  [this] (.force fc false))
+  (close [this] (save this) (.close fc))
   (kv [this k v]
       (let [key-hash  (int (hash k))
             first-buk (int (last-bits key-hash key-bits))
@@ -54,11 +54,11 @@
           (let [entry (+ (.position ^MappedByteBuffer (at this buk))
                          BUK-HDR
                          (* ENTRY i))]
-            (if (= (.getInt ^MappedByteBuffer (.position ^MappedByteBuffer file entry)) 0) ; find an empty entry
+            (if (= (.getInt ^MappedByteBuffer (.position file entry)) 0) ; find an empty entry
               (do
-                (.putInt ^MappedByteBuffer (.position ^MappedByteBuffer file entry) 1)
-                (.putInt ^MappedByteBuffer file key-hash)
-                (.putInt ^MappedByteBuffer file v))
+                (.putInt ^MappedByteBuffer (.position file entry) 1)
+                (.putInt file key-hash)
+                (.putInt file v))
               (if (= i (dec buk-size))
                 (if (= buk last-buk)
                   (kv (grow this last-buk) k v) ; grow when reaching last entry of last bucket
@@ -77,9 +77,9 @@
               result
               (do
                 (let [entry (+ (.position ^MappedByteBuffer (at this buk)) BUK-HDR (* ENTRY i))
-                      valid (int (.getInt ^MappedByteBuffer (.position ^MappedByteBuffer file entry)))
-                      key   (int (.getInt ^MappedByteBuffer file))
-                      val   (int (.getInt ^MappedByteBuffer file))]
+                      valid (int (.getInt ^MappedByteBuffer (.position file entry)))
+                      key   (int (.getInt file))
+                      val   (int (.getInt file))]
                   (if (and (= valid 1) (= key-hash key) (filt val))
                     (do
                       (proc entry)
@@ -97,22 +97,22 @@
                           (throw (Exception. (str "index " path " is corrupted, please repair collection")))))
                       (recur count result (inc i) buk)))))))))
   (k [this k limit filt] (scan this k limit (fn [_]) filt))
-  (x [this k limit filt] (scan this k limit #(.putInt ^MappedByteBuffer (.position ^MappedByteBuffer file %) 0) filt)))
+  (x [this k limit filt] (scan this k limit #(.putInt ^MappedByteBuffer (.position file %) 0) filt)))
 
-(defn open [path]
-  (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
-        file (.map ^FileChannel fc FileChannel$MapMode/READ_WRITE 0 (.size fc))
-        new-buk-pos (int (.getInt ^MappedByteBuffer file))
-        key-bits    (int (.getInt ^MappedByteBuffer file))
-        buk-size    (int (.getInt ^MappedByteBuffer file))]
+(defn open [^String path]
+  (let [fc   (.getChannel (RandomAccessFile. path "rw"))
+        file (.map fc FileChannel$MapMode/READ_WRITE 0 (.size fc))
+        new-buk-pos (int (.getInt file))
+        key-bits    (int (.getInt file))
+        buk-size    (int (.getInt file))]
     (Hash. path key-bits buk-size fc file (quot (- new-buk-pos FILE-HDR) (+ BUK-HDR (* buk-size ENTRY))))))
 
-(defn new [path key-bits buk-size]
-  (let [fc   (.getChannel (RandomAccessFile. ^String path "rw"))
+(defn new [^String path key-bits buk-size]
+  (let [fc   (.getChannel (RandomAccessFile. path "rw"))
         file (.map fc FileChannel$MapMode/READ_WRITE 0
                (+ FILE-HDR (* (Math/pow 2 key-bits)
                               (+ BUK-HDR (* buk-size ENTRY)))))]
-    (.putInt ^MappedByteBuffer file (.limit ^MappedByteBuffer file)) ; new bucket position
-    (.putInt ^MappedByteBuffer file key-bits)
-    (.putInt ^MappedByteBuffer file buk-size)
+    (.putInt file (.limit file)) ; new bucket position
+    (.putInt file key-bits)
+    (.putInt file buk-size)
     (open path)))

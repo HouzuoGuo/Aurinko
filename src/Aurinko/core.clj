@@ -18,9 +18,9 @@
             (run [] (locking db (db/save @db))))
           0 60000))
       (socket/server (Integer/parseInt (first args))
-                     (fn [in out]
+                     (fn [^java.io.InputStream in ^java.io.OutputStream out]
                        (binding [*in* (BufferedReader. (InputStreamReader. in))
-                                 *out* (PrintWriter. ^OutputStream out)]
+                                 *out* (PrintWriter. out)]
                          (loop []
                            (when-let [line (.readLine ^BufferedReader *in*)]
                              (try

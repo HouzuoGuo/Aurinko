@@ -4,15 +4,15 @@
            (java.io InputStreamReader OutputStream OutputStreamWriter PrintWriter)
            (clojure.lang LineNumberingPushbackReader)))
 (defn- on-thread [f]
-  (doto (Thread. #^Runnable f)
+  (doto (Thread. ^Runnable f)
     (.start)))
-(defn- close-socket [#^Socket s]
+(defn- close-socket [^Socket s]
   (when-not (.isClosed s)
     (doto s
       (.shutdownInput)
       (.shutdownOutput)
       (.close))))
-(defn- accept-fn [#^Socket s connections fun]
+(defn- accept-fn [^Socket s connections fun]
   (let [ins (.getInputStream s)
         outs (.getOutputStream s)]
     (on-thread #(do
@@ -36,4 +36,4 @@
   (doseq [s @(:connections server)]
     (close-socket s))
   (dosync (ref-set (:connections server) #{}))
-  (.close #^ServerSocket (:server-socket server)))
+  (.close ^ServerSocket (:server-socket server)))
